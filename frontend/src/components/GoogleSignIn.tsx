@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 
 interface GoogleSignInProps {
@@ -7,11 +7,20 @@ interface GoogleSignInProps {
 }
 
 const GoogleSignIn: React.FC<GoogleSignInProps> = ({ onSuccess, onError }) => {
+  useEffect(() => {
+    // Debug current URL and expected redirect URI
+    console.log('Current URL:', window.location.href);
+    console.log('Origin:', window.location.origin);
+    console.log('Google Client ID:', process.env.REACT_APP_GOOGLE_CLIENT_ID);
+  }, []);
+
   const handleSuccess = (credentialResponse: CredentialResponse) => {
+    console.log('Google sign-in successful:', credentialResponse);
     onSuccess(credentialResponse);
   };
 
   const handleError = () => {
+    console.error('Google sign-in error occurred');
     onError('Google sign-in failed. Please try again.');
   };
 
