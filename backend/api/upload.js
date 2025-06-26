@@ -63,8 +63,25 @@ module.exports = async function handler(req, res) {
     // For now, let's create a simple response to test the upload
     console.log(`PDF uploaded successfully: ${pdfFile.originalFilename}, Size: ${pdfBuffer.length} bytes`);
     
+    // Import progress functions
+    const progressModule = require('./progress');
+    
+    // Set initial progress
+    progressModule.updateProgress(sessionId, {
+      status: 'processing',
+      message: 'Starting PDF conversion...',
+      progress: 10
+    });
+    
     // TODO: Process PDF with OCR (temporarily disabled for testing)
     const markdown = `# ${pdfFile.originalFilename}\n\nProcessing temporarily disabled for testing.\n\nFile size: ${pdfBuffer.length} bytes\nPages: Unknown (analysis needed)\n\nThis is a test conversion.`;
+    
+    // Simulate progress updates
+    progressModule.updateProgress(sessionId, {
+      status: 'processing',
+      message: 'Converting PDF to Markdown...',
+      progress: 50
+    });
     
     // Generate download filename
     const originalName = pdfFile.originalFilename || 'document.pdf';
@@ -84,7 +101,14 @@ module.exports = async function handler(req, res) {
       createdAt: new Date(),
     });
 
-    // Progress tracking temporarily disabled for testing
+    // Mark as complete
+    progressModule.updateProgress(sessionId, {
+      status: 'complete',
+      message: 'Conversion completed successfully!',
+      progress: 100,
+      downloadUrl
+    });
+    
     console.log('Conversion completed successfully');
 
     res.status(200).json({
