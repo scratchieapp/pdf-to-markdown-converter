@@ -1,8 +1,12 @@
-import { handleCors } from './_utils/cors.js';
+module.exports = function handler(req, res) {
+  // Add CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-export default function handler(req, res) {
-  const corsResult = handleCors(req, res, ['GET', 'POST']);
-  if (corsResult) return corsResult;
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
 
   const testData = {
     message: 'API is working!',

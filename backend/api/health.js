@@ -1,8 +1,16 @@
-import { handleCors } from './_utils/cors.js';
+module.exports = function handler(req, res) {
+  // Add CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-export default function handler(req, res) {
-  const corsResult = handleCors(req, res, ['GET']);
-  if (corsResult) return corsResult;
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
   
   res.status(200).json({ 
     status: 'ok', 
@@ -10,4 +18,4 @@ export default function handler(req, res) {
     service: 'pdf-to-markdown-api',
     environment: process.env.NODE_ENV || 'development'
   });
-}
+};

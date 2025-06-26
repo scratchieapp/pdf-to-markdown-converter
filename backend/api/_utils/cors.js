@@ -1,11 +1,11 @@
-export function addCorsHeaders(res) {
+function addCorsHeaders(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
   res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
 }
 
-export function handleCors(req, res, allowedMethods = ['GET', 'POST']) {
+function handleCors(req, res, allowedMethods = ['GET', 'POST']) {
   addCorsHeaders(res);
   
   if (req.method === 'OPTIONS') {
@@ -18,3 +18,8 @@ export function handleCors(req, res, allowedMethods = ['GET', 'POST']) {
   
   return null; // Continue processing
 }
+
+module.exports = {
+  addCorsHeaders,
+  handleCors
+};
