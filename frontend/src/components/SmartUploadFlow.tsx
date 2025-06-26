@@ -141,57 +141,80 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
 
       setUploadProgress('Uploading PDF file...');
       setUploadStartTime(Date.now());
-      const uploadUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/upload`;
+      // Step 1: Upload PDF file only
+      const uploadUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/upload-only`;
       console.log('Uploading to:', uploadUrl);
       console.log('File size:', selectedFile.size, 'bytes');
       
-      // Add timeout for upload (2 minutes for upload, then we'll wait for OCR separately)
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => {
-        setUploadProgress('Upload taking longer than expected...');
-        controller.abort();
-      }, 120000);
+      // Short timeout for upload only (30 seconds)
+      const uploadController = new AbortController();
+      const uploadTimeoutId = setTimeout(() => {
+        setUploadProgress('Upload timeout - please try again');
+        uploadController.abort();
+      }, 30000);
       
       try {
-        const response = await fetch(uploadUrl, {
+        const uploadResponse = await fetch(uploadUrl, {
           method: 'POST',
           body: formData,
-          signal: controller.signal,
+          signal: uploadController.signal,
         });
         
-        clearTimeout(timeoutId);
-        console.log('Upload response:', response.status);
+        clearTimeout(uploadTimeoutId);
+        console.log('Upload response:', uploadResponse.status);
         
-        if (!response.ok) {
-          const errorData = await response.text();
+        if (!uploadResponse.ok) {
+          const errorData = await uploadResponse.text();
           console.error('Upload failed:', errorData);
           throw new Error(`Upload failed: ${errorData}`);
         }
         
-        setUploadProgress('Processing response...');
-        const result = await response.json();
-        console.log('Upload result:', result);
+        setUploadProgress('Upload complete! Starting OCR processing...');
+        const uploadResult = await uploadResponse.json();
+        console.log('Upload result:', uploadResult);
         
-        setSessionId(result.sessionId);
-        setUploadProgress('Upload complete! Processing PDF...');
+        setSessionId(uploadResult.sessionId);
         
-        // Check if conversion completed immediately (test mode)
-        if (result.success && result.downloadUrl && result.markdownLength < 200) {
-          // Likely test content, complete immediately
-          setDownloadUrl(result.downloadUrl);
-          setCurrentStep('complete');
-          console.log('Test conversion complete immediately');
-        } else {
-          // Real OCR processing, wait for polling to detect completion
-          console.log('OCR processing started, waiting for completion...');
-        }
+        // Step 2: Start OCR processing
+        console.log('Starting OCR processing...');
+        const ocrUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/process-ocr`;
+        
+        // Don't wait for OCR to complete - let progress polling handle it
+        fetch(ocrUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            sessionId: uploadResult.sessionId,
+          }),
+        }).then(ocrResponse => {
+          console.log('OCR processing initiated:', ocrResponse.status);
+          if (ocrResponse.ok) {
+            return ocrResponse.json();
+          }
+          throw new Error('OCR processing failed to start');
+        }).then(ocrResult => {
+          console.log('OCR result:', ocrResult);
+          if (ocrResult.success && ocrResult.downloadUrl) {
+            setDownloadUrl(ocrResult.downloadUrl);
+            setCurrentStep('complete');
+          }
+        }).catch(ocrError => {
+          console.error('OCR processing error:', ocrError);
+          setError('OCR processing failed. Please try again.');
+          setCurrentStep('error');
+        });
+        
+        // Move to OCR processing display immediately
+        setUploadProgress('');
         
       } catch (uploadError: any) {
-        clearTimeout(timeoutId);
+        clearTimeout(uploadTimeoutId);
         if (uploadError.name === 'AbortError') {
-          console.error('Upload timeout after 5 minutes');
-          setUploadProgress('Upload timeout - file may be too large');
-          throw new Error('Upload timeout - file may be too large');
+          console.error('Upload timeout after 30 seconds');
+          setUploadProgress('Upload timeout - please try again');
+          throw new Error('Upload timeout - please try again');
         }
         setUploadProgress(`Upload failed: ${uploadError.message}`);
         throw uploadError;
