@@ -219,7 +219,6 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
           // Processing completed immediately - set OCR to complete
           setOcrStatus('complete');
           setOcrProgress(100);
-          setOverallProgress(100);
           setDownloadUrl(uploadResult.downloadUrl);
           setCurrentStep('complete');
           console.log('Processing complete immediately');
