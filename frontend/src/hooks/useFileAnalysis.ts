@@ -31,6 +31,13 @@ export const useFileAnalysis = (): UseFileAnalysisResult => {
 
     try {
       console.log('Analyzing file:', file.name, 'Size:', file.size, 'Type:', file.type);
+      
+      // Check file size limit before sending to API
+      const fileSizeInMB = file.size / (1024 * 1024);
+      if (fileSizeInMB > 3) {
+        throw new Error(`File too large for processing. Maximum size is 3MB, your file is ${fileSizeInMB.toFixed(1)}MB. Please try a smaller file.`);
+      }
+      
       console.log('API URL:', `${API_URL}/api/analyze-pdf`);
       
       const formData = new FormData();

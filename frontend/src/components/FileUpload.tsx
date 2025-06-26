@@ -57,7 +57,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
         <p className="mt-2 text-sm text-gray-600">
           <span className="font-semibold">Click to upload</span> or drag and drop
         </p>
-        <p className="text-xs text-gray-500 mt-1">PDF files only (up to 50MB)</p>
+        <p className="text-xs text-gray-500 mt-1">PDF files only (up to 3MB for real-time processing)</p>
       </label>
     </div>
   );

@@ -113,8 +113,16 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
       return;
     }
 
+    // Check file size limit for serverless processing
+    const fileSizeInMB = selectedFile.size / (1024 * 1024);
+    if (fileSizeInMB > 3) {
+      setError(`File too large for current infrastructure. Please try a file smaller than 3MB. Your file is ${fileSizeInMB.toFixed(1)}MB.`);
+      setCurrentStep('error');
+      return;
+    }
+
     try {
-      console.log('Starting conversion...', { isFree, fileName: selectedFile.name });
+      console.log('Starting conversion...', { isFree, fileName: selectedFile.name, sizeInMB: fileSizeInMB.toFixed(1) });
       
       // Set processing step now that we're starting
       setCurrentStep('processing');

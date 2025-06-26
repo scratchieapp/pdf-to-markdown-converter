@@ -45,7 +45,7 @@ module.exports = async function handler(req, res) {
   try {
     const processFile = async () => {
       const form = formidable({
-        maxFileSize: 50 * 1024 * 1024, // 50MB
+        maxFileSize: 3 * 1024 * 1024, // 3MB - reduced for serverless compatibility
         filter: ({ mimetype }) => {
           return mimetype && mimetype.includes('pdf');
         },
