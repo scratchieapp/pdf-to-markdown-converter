@@ -326,7 +326,7 @@ const SmartUploadFlow: React.FC<SmartUploadFlowProps> = (props) => {
   return (
     <GoogleOAuthProvider 
       clientId={googleClientId}
-      onScriptLoadError={(error) => console.error('Google OAuth script load error:', error)}
+      onScriptLoadError={() => console.error('Google OAuth script load error')}
       onScriptLoadSuccess={() => console.log('Google OAuth script loaded successfully')}
     >
       <AuthContext.Provider value={authValue}>
