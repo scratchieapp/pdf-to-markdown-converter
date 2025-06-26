@@ -96,6 +96,7 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
   };
 
   const handlePaymentSuccess = async (paymentId: string) => {
+    console.log('Payment successful, payment intent ID:', paymentId);
     setPaymentIntentId(paymentId);
     setCurrentStep('processing');
     await startConversion(false); // false = paid conversion
@@ -125,6 +126,7 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
           console.log('Free trial response:', freeTrialResponse.status);
         }
       } else if (paymentIntentId) {
+        console.log('Adding payment intent to form:', paymentIntentId);
         formData.append('paymentIntentId', paymentIntentId);
       }
 
@@ -274,14 +276,21 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         );
 
       case 'processing':
+        console.log('Rendering processing step, progress:', progress);
+        console.log('Session ID:', sessionId);
         return (
           <div className="text-center py-8">
             <ProgressBar
               progress={progress.progress}
-              message={progress.message}
+              message={progress.message || 'Processing your PDF...'}
               currentPage={undefined}
               totalPages={undefined}
             />
+            {progress.status === 'idle' && (
+              <p className="text-sm text-gray-500 mt-4">
+                Starting conversion... Session: {sessionId || 'none'}
+              </p>
+            )}
           </div>
         );
 
