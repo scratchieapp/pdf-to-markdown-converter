@@ -141,17 +141,17 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
 
       setUploadProgress('Uploading PDF file...');
       setUploadStartTime(Date.now());
-      // Use the working upload endpoint with test content for now
-      const uploadUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/upload`;
+      // Use upload-only endpoint to avoid timeout issues
+      const uploadUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/upload-only`;
       console.log('Uploading to:', uploadUrl);
       console.log('File size:', selectedFile.size, 'bytes');
       
-      // Short timeout for upload (30 seconds)
+      // Longer timeout for actual upload (2 minutes)
       const uploadController = new AbortController();
       const uploadTimeoutId = setTimeout(() => {
-        setUploadProgress('Upload timeout - please try again');
+        setUploadProgress('Upload timeout - file may be too large');
         uploadController.abort();
-      }, 30000);
+      }, 120000);
       
       try {
         const uploadResponse = await fetch(uploadUrl, {
@@ -175,25 +175,45 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         
         setSessionId(uploadResult.sessionId);
         
-        // Check if this is real OCR processing or test content
-        if (uploadResult.success && uploadResult.downloadUrl && uploadResult.markdownLength < 300) {
-          // Likely test content, complete immediately
-          setDownloadUrl(uploadResult.downloadUrl);
-          setCurrentStep('complete');
-          console.log('Test conversion complete immediately');
-        } else {
-          // Real OCR processing - let progress polling handle completion
-          console.log('Real OCR processing started, waiting for completion...');
+        // Now trigger OCR processing in background via simplified endpoint
+        console.log('Starting background OCR processing...');
+        setUploadProgress('Upload complete! Processing PDF with Mistral AI...');
+        
+        // Use the working upload endpoint for OCR processing
+        const ocrFormData = new FormData();
+        ocrFormData.append('pdf', selectedFile);
+        if (paymentIntentId) {
+          ocrFormData.append('paymentIntentId', paymentIntentId);
         }
+        
+        // Start OCR processing but don't wait for it - let progress polling handle it
+        fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/upload`, {
+          method: 'POST',
+          body: ocrFormData,
+        }).then(async (ocrResponse) => {
+          console.log('OCR processing response:', ocrResponse.status);
+          if (ocrResponse.ok) {
+            const ocrResult = await ocrResponse.json();
+            console.log('OCR processing complete:', ocrResult);
+            if (ocrResult.success && ocrResult.downloadUrl) {
+              setDownloadUrl(ocrResult.downloadUrl);
+              setCurrentStep('complete');
+            }
+          }
+        }).catch((ocrError) => {
+          console.error('OCR processing error:', ocrError);
+          setError('OCR processing failed. Please try again.');
+          setCurrentStep('error');
+        });
         
         setUploadProgress('');
         
       } catch (uploadError: any) {
         clearTimeout(uploadTimeoutId);
         if (uploadError.name === 'AbortError') {
-          console.error('Upload timeout after 30 seconds');
-          setUploadProgress('Upload timeout - please try again');
-          throw new Error('Upload timeout - please try again');
+          console.error('Upload timeout after 2 minutes');
+          setUploadProgress('Upload timeout - file may be too large');
+          throw new Error('Upload timeout - file may be too large');
         }
         setUploadProgress(`Upload failed: ${uploadError.message}`);
         throw uploadError;
@@ -340,7 +360,9 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
                   </p>
                 )}
                 <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
-                  <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+                  <div className="bg-blue-600 h-2 rounded-full transition-all duration-1000" style={{ 
+                    width: uploadStartTime ? `${Math.min(90, (Date.now() - uploadStartTime) / 1000 * 3)}%` : '10%' 
+                  }}></div>
                 </div>
                 {uploadStartTime && (Date.now() - uploadStartTime) > 30000 && (
                   <p className="text-xs text-orange-600 mt-2">
