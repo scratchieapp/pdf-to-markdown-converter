@@ -1,4 +1,4 @@
-const formidable = require('formidable');
+const formidable = require('formidable').default || require('formidable');
 const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');

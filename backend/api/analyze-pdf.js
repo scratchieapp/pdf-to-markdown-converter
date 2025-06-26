@@ -1,5 +1,5 @@
 const { PDFDocument } = require('pdf-lib');
-const formidable = require('formidable');
+const formidable = require('formidable').default || require('formidable');
 const fs = require('fs');
 
 exports.config = {
