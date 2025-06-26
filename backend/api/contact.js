@@ -1,4 +1,4 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
 exports.config = {
   api: {
@@ -71,49 +71,29 @@ Timestamp: ${new Date().toISOString()}
 User IP: ${req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'Unknown'}
 `;
 
-    // Try to send email using environment variables for email service
-    if (process.env.EMAIL_SERVICE_API_KEY || process.env.SMTP_HOST) {
+    // Send email using Resend
+    if (process.env.RESEND_API_KEY) {
       try {
-        if (process.env.EMAIL_SERVICE_API_KEY) {
-          // Using a service like SendGrid, Mailgun, etc.
-          console.log('Attempting to send email via email service...');
-          
-          // For now, we'll log the email content
-          // In production, you'd integrate with your preferred email service
-          console.log('Email would be sent to: james@scratchie.com');
-          console.log('Subject:', emailSubject);
-          console.log('Body:', emailBody);
-          
-        } else if (process.env.SMTP_HOST) {
-          // Using SMTP
-          console.log('Attempting to send email via SMTP...');
-          
-          const transporter = nodemailer.createTransporter({
-            host: process.env.SMTP_HOST,
-            port: parseInt(process.env.SMTP_PORT || '587'),
-            secure: process.env.SMTP_SECURE === 'true',
-            auth: {
-              user: process.env.SMTP_USER,
-              pass: process.env.SMTP_PASS,
-            },
-          });
+        console.log('Attempting to send email via Resend...');
+        
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        
+        const emailResult = await resend.emails.send({
+          from: 'PDF Converter <noreply@scratchie.com>', // Must be from verified domain
+          to: 'james@scratchie.com',
+          subject: emailSubject,
+          text: emailBody,
+          reply_to: sanitizedEmail, // User's email as reply-to
+        });
 
-          await transporter.sendMail({
-            from: process.env.SMTP_FROM || 'noreply@yourdomain.com',
-            to: 'james@scratchie.com',
-            subject: emailSubject,
-            text: emailBody,
-            replyTo: sanitizedEmail,
-          });
-
-          console.log('Email sent successfully via SMTP');
-        }
+        console.log('Email sent successfully via Resend:', emailResult.data?.id);
+        
       } catch (emailError) {
-        console.error('Failed to send email:', emailError);
+        console.error('Failed to send email via Resend:', emailError);
         // Don't fail the request if email fails - still log the contact
       }
     } else {
-      console.log('No email service configured - logging contact form submission:');
+      console.log('RESEND_API_KEY not configured - logging contact form submission:');
       console.log('TO: james@scratchie.com');
       console.log('SUBJECT:', emailSubject);
       console.log('BODY:', emailBody);
