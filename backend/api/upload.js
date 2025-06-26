@@ -82,41 +82,32 @@ module.exports = async function handler(req, res) {
     console.log('Payment intent ID:', paymentIntentId);
     
     try {
-      // Use a hybrid approach - real OCR for small files, fallback for large files
+      // Process PDF with OCR for all file sizes
       const fileSizeInMB = pdfBuffer.length / (1024 * 1024);
-      const skipOCR = fileSizeInMB > 2; // Skip OCR for files larger than 2MB to avoid timeouts
+      console.log(`File size: ${fileSizeInMB.toFixed(2)}MB - Processing with Mistral OCR`);
       
-      console.log(`File size: ${fileSizeInMB.toFixed(2)}MB, Skip OCR: ${skipOCR}`);
+      progressModule.updateProgress(sessionId, {
+        status: 'processing',
+        message: 'Processing PDF with Mistral AI...',
+        progress: 30
+      });
       
-      if (skipOCR) {
-        console.log('Skipping OCR for debugging...');
-        markdown = `# ${pdfFile.originalFilename}\n\n## ⚠️ Large File Processing\n\nYour PDF (${fileSizeInMB.toFixed(2)}MB) has been processed successfully, but we're currently using a simplified conversion for files over 2MB to ensure fast delivery.\n\n**File Details:**\n- **Size:** ${fileSizeInMB.toFixed(2)}MB (${pdfBuffer.length.toLocaleString()} bytes)\n- **Payment ID:** ${paymentIntentId || 'Free trial'}\n- **Processing:** Fast mode (no OCR timeout)\n\n## 🚀 Full OCR Processing Coming Soon\n\nWe're working on enhancing our Mistral AI integration to handle large files. For now, you get instant results!\n\n**Your payment was processed successfully.** Contact support if you need full OCR processing for this document.\n\n---\n*Powered by The No-Nonsense PDF to Markdown Converter*`;
-      } else {
-        // Process PDF with OCR
-        console.log('Calling Mistral OCR...');
-        progressModule.updateProgress(sessionId, {
-          status: 'processing',
-          message: 'Processing PDF with Mistral AI...',
-          progress: 30
-        });
-        
-        // Add timeout for OCR (4 minutes to stay under 5-minute Vercel limit)
-        const ocrPromise = callMistralOCR(pdfBuffer, pdfFile.originalFilename);
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('OCR processing timeout')), 240000)
-        );
-        
-        const ocrResult = await Promise.race([ocrPromise, timeoutPromise]);
-        
-        progressModule.updateProgress(sessionId, {
-          status: 'processing',
-          message: 'Converting to Markdown...',
-          progress: 70
-        });
-        
-        // Convert OCR result to markdown
-        markdown = await convertToMarkdown([{ content: ocrResult, pageRange: [0, -1] }], sessionId);
-      }
+      // Add timeout for OCR (4 minutes to stay under 5-minute Vercel limit)
+      const ocrPromise = callMistralOCR(pdfBuffer, pdfFile.originalFilename);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('OCR processing timeout')), 240000)
+      );
+      
+      const ocrResult = await Promise.race([ocrPromise, timeoutPromise]);
+      
+      progressModule.updateProgress(sessionId, {
+        status: 'processing',
+        message: 'Converting to Markdown...',
+        progress: 70
+      });
+      
+      // Convert OCR result to markdown
+      markdown = await convertToMarkdown([{ content: ocrResult, pageRange: [0, -1] }], sessionId);
       
     } catch (ocrError) {
       console.error('OCR processing failed:', ocrError);

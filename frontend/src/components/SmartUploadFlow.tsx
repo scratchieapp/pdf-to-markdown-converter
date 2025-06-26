@@ -146,12 +146,12 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
       console.log('Uploading to:', uploadUrl);
       console.log('File size:', selectedFile.size, 'bytes');
       
-      // Reasonable timeout for upload + processing (90 seconds)
+      // Extended timeout for full OCR processing (4.5 minutes)
       const uploadController = new AbortController();
       const uploadTimeoutId = setTimeout(() => {
-        setUploadProgress('Processing timeout - file may be too large for real-time OCR');
+        setUploadProgress('Processing timeout - OCR took too long');
         uploadController.abort();
-      }, 90000);
+      }, 270000);
       
       try {
         const uploadResponse = await fetch(uploadUrl, {
@@ -187,9 +187,9 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
       } catch (uploadError: any) {
         clearTimeout(uploadTimeoutId);
         if (uploadError.name === 'AbortError') {
-          console.error('Upload timeout after 2 minutes');
-          setUploadProgress('Upload timeout - file may be too large');
-          throw new Error('Upload timeout - file may be too large');
+          console.error('Processing timeout after 4.5 minutes');
+          setUploadProgress('OCR processing timeout - file may be too complex');
+          throw new Error('OCR processing timeout - file may be too complex');
         }
         setUploadProgress(`Upload failed: ${uploadError.message}`);
         throw uploadError;
@@ -342,18 +342,18 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
                 </div>
                 {uploadStartTime && (Date.now() - uploadStartTime) > 30000 && (
                   <p className="text-xs text-orange-600 mt-2">
-                    Upload taking longer than expected... This may indicate OCR processing has started.
+                    OCR processing in progress... Large files may take several minutes.
                   </p>
                 )}
-                {uploadStartTime && (Date.now() - uploadStartTime) > 60000 && (
+                {uploadStartTime && (Date.now() - uploadStartTime) > 120000 && (
                   <button
                     onClick={() => {
-                      setError('Upload timeout - please try again with a smaller PDF');
+                      setError('Processing timeout - OCR took too long for this PDF');
                       setCurrentStep('error');
                     }}
                     className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700"
                   >
-                    Cancel Upload
+                    Cancel Processing
                   </button>
                 )}
               </div>
