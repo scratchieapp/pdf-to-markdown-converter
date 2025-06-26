@@ -18,7 +18,7 @@ exports.config = {
     bodyParser: false,
   },
   functions: {
-    maxDuration: 300, // 5 minutes
+    maxDuration: 300, // 5 minutes for OCR processing
   },
 };
 
@@ -65,6 +65,8 @@ module.exports = async function handler(req, res) {
     
     // Import progress functions
     const progressModule = require('./progress');
+    const { callMistralOCR } = require('./ocr/mistral');
+    const { convertToMarkdown } = require('./ocr/markdownConverter');
     
     // Set initial progress
     progressModule.updateProgress(sessionId, {
@@ -73,15 +75,33 @@ module.exports = async function handler(req, res) {
       progress: 10
     });
     
-    // TODO: Process PDF with OCR (temporarily disabled for testing)
-    const markdown = `# ${pdfFile.originalFilename}\n\nProcessing temporarily disabled for testing.\n\nFile size: ${pdfBuffer.length} bytes\nPages: Unknown (analysis needed)\n\nThis is a test conversion.`;
+    let markdown;
     
-    // Simulate progress updates
-    progressModule.updateProgress(sessionId, {
-      status: 'processing',
-      message: 'Converting PDF to Markdown...',
-      progress: 50
-    });
+    try {
+      // Process PDF with OCR
+      console.log('Calling Mistral OCR...');
+      progressModule.updateProgress(sessionId, {
+        status: 'processing',
+        message: 'Processing PDF with Mistral AI...',
+        progress: 30
+      });
+      
+      const ocrResult = await callMistralOCR(pdfBuffer, pdfFile.originalFilename);
+      
+      progressModule.updateProgress(sessionId, {
+        status: 'processing',
+        message: 'Converting to Markdown...',
+        progress: 70
+      });
+      
+      // Convert OCR result to markdown
+      markdown = await convertToMarkdown([{ content: ocrResult, pageRange: [0, -1] }], sessionId);
+      
+    } catch (ocrError) {
+      console.error('OCR processing failed:', ocrError);
+      // Fallback to test content if OCR fails
+      markdown = `# ${pdfFile.originalFilename}\n\nOCR processing failed: ${ocrError.message}\n\nFile size: ${pdfBuffer.length} bytes\n\nPlease try again or contact support.`;
+    }
     
     // Generate download filename
     const originalName = pdfFile.originalFilename || 'document.pdf';
