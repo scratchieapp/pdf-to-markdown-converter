@@ -45,6 +45,11 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
   const [uploadProgress, setUploadProgress] = useState<string>('');
   const [uploadStartTime, setUploadStartTime] = useState<number | null>(null);
   const [uploadPercentage, setUploadPercentage] = useState<number>(0);
+  
+  // Separate status tracking for different phases
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'complete' | 'error'>('idle');
+  const [ocrStatus, setOcrStatus] = useState<'idle' | 'processing' | 'complete' | 'error'>('idle');
+  const [overallProgress, setOverallProgress] = useState<number>(0);
 
   const { analysis, isAnalyzing, error: analysisError, analyzeFile, reset: resetAnalysis } = useFileAnalysis();
   const { login } = useAuth();
@@ -53,14 +58,21 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
   // Handle progress updates and completion
   useEffect(() => {
     if (progress.status === 'complete' && progress.downloadUrl) {
+      setOcrStatus('complete');
+      setOverallProgress(100);
       setDownloadUrl(progress.downloadUrl);
       setCurrentStep('complete');
       onConversionComplete?.(progress.downloadUrl);
     } else if (progress.status === 'error') {
+      setOcrStatus('error');
       setError(progress.message || 'Conversion failed');
       setCurrentStep('error');
+    } else if (progress.status === 'processing' && sessionId) {
+      // Update OCR progress (second half of overall progress: 50% + progress/2)
+      const ocrProgress = progress.progress || 0;
+      setOverallProgress(50 + Math.floor(ocrProgress * 0.5));
     }
-  }, [progress, onConversionComplete]);
+  }, [progress, onConversionComplete, sessionId]);
 
   const handleFileSelect = async (file: File) => {
     setSelectedFile(file);
@@ -166,18 +178,23 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
       let progressInterval: NodeJS.Timeout | null = null;
       
       try {
-        // Upload with progress tracking
+        // Start upload phase
+        setUploadStatus('uploading');
         setUploadProgress('Starting upload...');
         setUploadPercentage(10);
+        setOverallProgress(5); // Upload is first 50% of overall process
         
         // Simulate upload progress more accurately
         progressInterval = setInterval(() => {
           setUploadPercentage(prev => {
-            // Slow down as we approach completion to avoid hitting 100% too early
-            if (prev < 50) return prev + Math.random() * 8;
-            if (prev < 75) return prev + Math.random() * 4;
-            if (prev < 90) return prev + Math.random() * 2;
-            return prev + Math.random() * 0.5; // Very slow after 90%
+            const newProgress = prev < 50 ? prev + Math.random() * 8 :
+                               prev < 75 ? prev + Math.random() * 4 :
+                               prev < 90 ? prev + Math.random() * 2 :
+                               prev + Math.random() * 0.5;
+            
+            // Update overall progress (upload is 50% of total)
+            setOverallProgress(Math.floor(newProgress * 0.5));
+            return newProgress;
           });
         }, 800);
         
@@ -189,17 +206,21 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         
         if (progressInterval) clearInterval(progressInterval);
         setUploadPercentage(100);
+        setUploadStatus('complete');
+        setOverallProgress(50); // Upload complete, now 50% done overall
         clearTimeout(uploadTimeoutId);
         console.log('Upload response status:', uploadResponse.status);
         console.log('Upload response headers:', Object.fromEntries(uploadResponse.headers.entries()));
         
         if (!uploadResponse.ok) {
+          setUploadStatus('error');
           const errorData = await uploadResponse.text();
           console.error('Upload failed with status:', uploadResponse.status, 'Data:', errorData);
           throw new Error(`Upload failed (${uploadResponse.status}): ${errorData}`);
         }
         
         setUploadProgress('Upload complete, processing PDF...');
+        setOcrStatus('processing'); // Start OCR phase
         const uploadResult = await uploadResponse.json();
         console.log('Upload result:', uploadResult);
         
@@ -211,6 +232,8 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         
         // Check if processing is complete or we need to poll for progress
         if (uploadResult.downloadUrl) {
+          setOcrStatus('complete');
+          setOverallProgress(100);
           setDownloadUrl(uploadResult.downloadUrl);
           setCurrentStep('complete');
           console.log('Processing complete immediately');
@@ -222,7 +245,7 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
             console.log('Markdown content stored for direct download');
           }
         } else {
-          // Continue with progress polling
+          // Continue with progress polling for OCR
           setUploadProgress('OCR processing started...');
           console.log('Waiting for OCR processing, session:', uploadResult.sessionId);
         }
@@ -264,6 +287,12 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
     setUploadProgress('');
     setUploadStartTime(null);
     setUploadPercentage(0);
+    
+    // Reset all status tracking
+    setUploadStatus('idle');
+    setOcrStatus('idle');
+    setOverallProgress(0);
+    
     resetProgress();
     resetAnalysis();
   };
@@ -367,68 +396,113 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         );
 
       case 'processing':
-        console.log('Rendering processing step, progress:', progress);
-        console.log('Session ID:', sessionId);
-        console.log('Upload progress:', uploadProgress);
         return (
           <div className="text-center py-8">
-            {/* Upload Progress Section */}
-            {!sessionId && (
-              <div className="mb-6">
-                <div className="text-blue-600 mb-2">
-                  <svg className="w-8 h-8 mx-auto animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {/* Overall Progress */}
+            <div className="mb-8">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Converting PDF to Markdown</h2>
+              <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
+                <div className="bg-green-600 h-3 rounded-full transition-all duration-500" style={{ 
+                  width: `${overallProgress}%` 
+                }}></div>
+              </div>
+              <p className="text-sm text-gray-600">{overallProgress}% Complete</p>
+            </div>
+
+            {/* Upload Phase */}
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center mb-2">
+                {uploadStatus === 'uploading' && (
+                  <svg className="w-5 h-5 text-blue-600 animate-spin mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                   </svg>
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Uploading PDF</h3>
-                <p className="text-sm text-gray-600">{uploadProgress || 'Preparing upload...'}</p>
-                {uploadStartTime && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    {Math.floor((Date.now() - uploadStartTime) / 1000)}s elapsed
-                  </p>
                 )}
-                <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
-                  <div className="bg-blue-600 h-2 rounded-full transition-all duration-500" style={{ 
-                    width: `${uploadPercentage}%` 
-                  }}></div>
-                </div>
-                {uploadStartTime && (Date.now() - uploadStartTime) > 30000 && (
-                  <p className="text-xs text-orange-600 mt-2">
-                    OCR processing in progress... Large files may take several minutes.
-                  </p>
+                {uploadStatus === 'complete' && (
+                  <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
                 )}
-                {uploadStartTime && (Date.now() - uploadStartTime) > 90000 && (
-                  <button
-                    onClick={() => {
-                      setError('Upload timeout - file may be too large for serverless processing');
-                      setCurrentStep('error');
-                    }}
-                    className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700"
-                  >
-                    Cancel Upload
-                  </button>
+                {uploadStatus === 'error' && (
+                  <svg className="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 )}
+                <h3 className="text-lg font-medium text-gray-900">1. Upload File</h3>
               </div>
-            )}
-            
-            {/* OCR Processing Section */}
-            {sessionId && (
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Processing with Mistral AI</h3>
-                <ProgressBar
-                  progress={progress.progress}
-                  message={progress.message || 'Converting PDF to Markdown...'}
-                  currentPage={undefined}
-                  totalPages={undefined}
-                />
-                {progress.status === 'idle' && (
-                  <div className="mt-4">
-                    <p className="text-sm text-gray-500">
-                      Starting OCR processing... Session: {sessionId.substring(0, 8)}...
-                    </p>
+              {uploadStatus === 'uploading' && (
+                <>
+                  <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                    <div className="bg-blue-600 h-2 rounded-full transition-all duration-500" style={{ 
+                      width: `${uploadPercentage}%` 
+                    }}></div>
                   </div>
+                  <p className="text-sm text-gray-600">{uploadProgress || 'Uploading...'}</p>
+                </>
+              )}
+              {uploadStatus === 'complete' && (
+                <p className="text-sm text-green-600">File uploaded successfully</p>
+              )}
+              {uploadStatus === 'error' && (
+                <p className="text-sm text-red-600">Upload failed</p>
+              )}
+            </div>
+
+            {/* OCR Phase */}
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center mb-2">
+                {ocrStatus === 'processing' && (
+                  <svg className="w-5 h-5 text-blue-600 animate-spin mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
+                  </svg>
                 )}
+                {ocrStatus === 'complete' && (
+                  <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+                {ocrStatus === 'error' && (
+                  <svg className="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                )}
+                {ocrStatus === 'idle' && uploadStatus === 'complete' && (
+                  <svg className="w-5 h-5 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                )}
+                <h3 className="text-lg font-medium text-gray-900">2. OCR Processing</h3>
               </div>
+              {ocrStatus === 'processing' && (
+                <>
+                  <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                    <div className="bg-blue-600 h-2 rounded-full transition-all duration-500" style={{ 
+                      width: `${progress.progress || 0}%` 
+                    }}></div>
+                  </div>
+                  <p className="text-sm text-gray-600">{progress.message || 'Processing with Mistral AI...'}</p>
+                </>
+              )}
+              {ocrStatus === 'complete' && (
+                <p className="text-sm text-green-600">OCR processing completed</p>
+              )}
+              {ocrStatus === 'error' && (
+                <p className="text-sm text-red-600">OCR processing failed</p>
+              )}
+              {ocrStatus === 'idle' && uploadStatus === 'complete' && (
+                <p className="text-sm text-gray-600">Waiting to start OCR processing...</p>
+              )}
+            </div>
+
+            {uploadStartTime && (Date.now() - uploadStartTime) > 90000 && uploadStatus === 'uploading' && (
+              <button
+                onClick={() => {
+                  setError('Upload timeout - file may be too large for serverless processing');
+                  setCurrentStep('error');
+                }}
+                className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700"
+              >
+                Cancel Upload
+              </button>
             )}
           </div>
         );
