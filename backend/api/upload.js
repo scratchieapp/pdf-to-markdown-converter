@@ -148,7 +148,7 @@ module.exports = async function handler(req, res) {
       
       // Fallback content with refund confirmation
       const refundMessage = paymentIntentId ? 
-        '✅ **Automatic Refund Issued**\n\nWe\'ve automatically refunded your $5 payment. No action needed on your part.' :
+        '✅ **Automatic Refund Issued**\n\nWe\'ve automatically refunded your $3 payment. No action needed on your part.' :
         '✅ **Free Trial**\n\nNo charge was made for this conversion.';
       
       markdown = `# ${pdfFile.originalFilename}\n\n⚠️ **Conversion Failed**\n\n${errorMessage}\n\n${refundMessage}\n\n**Technical Details:**\n- File size: ${pdfBuffer.length} bytes\n- Error: ${ocrError.message}\n- Payment ID: ${paymentIntentId || 'Free trial'}\n\nYou can try converting a different PDF or a smaller version of this file.`;

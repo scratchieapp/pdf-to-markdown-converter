@@ -36,7 +36,7 @@ export default async function handler(req, res) {
 
     // Determine pricing and flow
     const isFreeEligible = pageCount <= 10;
-    const price = isFreeEligible ? 0 : 5;
+    const price = isFreeEligible ? 0 : 3; // Launch discount: $3 (was $5)
 
     res.status(200).json({
       success: true,
