@@ -439,7 +439,12 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
             {ocrStatus === 'processing' && (
               <div className="mb-8 p-6 bg-green-50 rounded-lg border border-green-200">
                 <div className="flex items-center justify-center mb-3">
-                  <svg className="w-6 h-6 text-green-600 animate-spin mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <img 
+                    src="/mistral-ai-icon.svg" 
+                    alt="Mistral AI" 
+                    className="w-6 h-6 mr-3"
+                  />
+                  <svg className="w-5 h-5 text-green-600 animate-spin mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
                   </svg>
                   <h3 className="text-lg font-semibold text-green-900">Processing with Mistral AI</h3>
@@ -475,6 +480,11 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
                 </div>
                 
                 <div className="flex items-center">
+                  <img 
+                    src="/mistral-ai-icon.svg" 
+                    alt="Mistral AI" 
+                    className="w-4 h-4 mr-1 opacity-70"
+                  />
                   {ocrStatus === 'complete' ? (
                     <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -487,7 +497,7 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
                     <div className="w-5 h-5 rounded-full bg-gray-300 mr-2"></div>
                   )}
                   <span className={`text-sm ${ocrStatus === 'complete' ? 'text-green-600' : ocrStatus === 'processing' ? 'text-green-600' : 'text-gray-500'}`}>
-                    OCR {ocrStatus === 'complete' ? 'Complete' : ocrStatus === 'processing' ? 'Processing' : 'Pending'}
+                    Mistral OCR {ocrStatus === 'complete' ? 'Complete' : ocrStatus === 'processing' ? 'Processing' : 'Pending'}
                   </span>
                 </div>
               </div>
@@ -529,6 +539,17 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
               >
                 Convert another PDF
               </button>
+            </div>
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="flex items-center justify-center text-xs text-gray-500">
+                <span className="mr-2">Powered by</span>
+                <img 
+                  src="/mistral-ai-icon.svg" 
+                  alt="Mistral AI" 
+                  className="w-4 h-4 mr-1"
+                />
+                <span>Mistral AI</span>
+              </div>
             </div>
           </div>
         );
