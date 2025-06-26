@@ -2,24 +2,8 @@ const { OAuth2Client } = require('google-auth-library');
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// In-memory user storage (replace with database in production)
-const users = new Map();
-
-const getUser = (userId) => users.get(userId);
-
-const createUser = (googleId, { email, name, picture }) => {
-  const user = {
-    id: googleId,
-    email,
-    name,
-    picture,
-    freeTrialUsed: false,
-    conversions: [],
-    createdAt: new Date(),
-  };
-  users.set(googleId, user);
-  return user;
-};
+// Import shared user storage
+const { getUser, createUser } = require('./userStorage');
 
 const jwt = require('jsonwebtoken');
 

@@ -1,6 +1,4 @@
 const jwt = require('jsonwebtoken');
-
-// Import shared user storage
 const { getUser } = require('./userStorage');
 
 module.exports = async function handler(req, res) {
@@ -24,24 +22,20 @@ module.exports = async function handler(req, res) {
     }
 
     const token = authHeader.substring(7);
-    
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
     const user = getUser(decoded.userId);
 
     if (!user) {
-      return res.status(401).json({ error: 'User not found' });
+      return res.status(404).json({ error: 'User not found' });
     }
 
     res.status(200).json({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      picture: user.picture,
-      freeTrialUsed: user.freeTrialUsed,
+      canUseTrial: !user.freeTrialUsed,
+      freeTrialUsed: user.freeTrialUsed
     });
 
   } catch (error) {
-    console.error('Token verification error:', error);
+    console.error('Free trial status check error:', error);
     res.status(401).json({ error: 'Invalid token' });
   }
 }
