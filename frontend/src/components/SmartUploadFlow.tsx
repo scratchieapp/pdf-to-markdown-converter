@@ -164,13 +164,16 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         
         setSessionId(result.sessionId);
         
-        // For serverless/test mode, the conversion is instant
-        if (result.success && result.downloadUrl) {
+        // Check if conversion completed immediately (test mode)
+        if (result.success && result.downloadUrl && result.markdownLength < 200) {
+          // Likely test content, complete immediately
           setDownloadUrl(result.downloadUrl);
           setCurrentStep('complete');
-          console.log('Conversion complete immediately');
+          console.log('Test conversion complete immediately');
+        } else {
+          // Real OCR processing, wait for polling to detect completion
+          console.log('OCR processing started, waiting for completion...');
         }
-        // Otherwise, polling will handle progress updates and completion detection
         
       } catch (uploadError: any) {
         clearTimeout(timeoutId);

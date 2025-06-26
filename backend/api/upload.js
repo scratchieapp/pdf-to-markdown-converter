@@ -82,8 +82,8 @@ module.exports = async function handler(req, res) {
     console.log('Payment intent ID:', paymentIntentId);
     
     try {
-      // For now, skip OCR for debugging
-      const skipOCR = true; // Temporary flag
+      // Re-enable OCR processing
+      const skipOCR = false; // OCR processing enabled
       
       if (skipOCR) {
         console.log('Skipping OCR for debugging...');
@@ -97,7 +97,13 @@ module.exports = async function handler(req, res) {
           progress: 30
         });
         
-        const ocrResult = await callMistralOCR(pdfBuffer, pdfFile.originalFilename);
+        // Add timeout for OCR (4 minutes to stay under 5-minute Vercel limit)
+        const ocrPromise = callMistralOCR(pdfBuffer, pdfFile.originalFilename);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('OCR processing timeout')), 240000)
+        );
+        
+        const ocrResult = await Promise.race([ocrPromise, timeoutPromise]);
         
         progressModule.updateProgress(sessionId, {
           status: 'processing',
@@ -111,8 +117,19 @@ module.exports = async function handler(req, res) {
       
     } catch (ocrError) {
       console.error('OCR processing failed:', ocrError);
-      // Fallback to test content if OCR fails
-      markdown = `# ${pdfFile.originalFilename}\n\nOCR processing failed: ${ocrError.message}\n\nFile size: ${pdfBuffer.length} bytes\n\nPlease try again or contact support.`;
+      
+      // Provide different error messages based on the error type
+      let errorMessage = 'OCR processing failed. Please try again or contact support.';
+      if (ocrError.message.includes('timeout')) {
+        errorMessage = 'OCR processing took too long. Your PDF may be too large or complex. Please try with a smaller file or contact support.';
+      } else if (ocrError.message.includes('401')) {
+        errorMessage = 'OCR service authentication failed. Please contact support.';
+      } else if (ocrError.message.includes('422')) {
+        errorMessage = 'Your PDF format is not supported or may be corrupted. Please try with a different PDF.';
+      }
+      
+      // Fallback content with helpful error message
+      markdown = `# ${pdfFile.originalFilename}\n\n⚠️ **OCR Processing Failed**\n\n${errorMessage}\n\n**Technical Details:**\n- File size: ${pdfBuffer.length} bytes\n- Error: ${ocrError.message}\n- Payment ID: ${paymentIntentId || 'Free trial'}\n\nYour payment was processed successfully. Please contact support for assistance.`;
     }
     
     // Generate download filename
