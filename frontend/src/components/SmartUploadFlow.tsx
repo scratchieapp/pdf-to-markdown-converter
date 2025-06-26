@@ -49,6 +49,7 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'complete' | 'error'>('idle');
   const [ocrStatus, setOcrStatus] = useState<'idle' | 'processing' | 'complete' | 'error'>('idle');
   const [overallProgress, setOverallProgress] = useState<number>(0);
+  const [ocrProgress, setOcrProgress] = useState<number>(0);
 
   const { analysis, isAnalyzing, error: analysisError, analyzeFile, reset: resetAnalysis } = useFileAnalysis();
   const { login } = useAuth();
@@ -58,6 +59,7 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
   useEffect(() => {
     if (progress.status === 'complete' && progress.downloadUrl) {
       setOcrStatus('complete');
+      setOcrProgress(100);
       setOverallProgress(100);
       setDownloadUrl(progress.downloadUrl);
       setCurrentStep('complete');
@@ -67,11 +69,16 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
       setError(progress.message || 'Conversion failed');
       setCurrentStep('error');
     } else if (progress.status === 'processing' && sessionId) {
-      // Update OCR progress (second half of overall progress: 50% + progress/2)
-      const ocrProgress = progress.progress || 0;
-      setOverallProgress(50 + Math.floor(ocrProgress * 0.5));
+      // Update OCR progress independently
+      const currentOcrProgress = progress.progress || 0;
+      setOcrProgress(currentOcrProgress);
+      
+      // Update overall progress (50% from upload + 50% from OCR)
+      const uploadContribution = uploadStatus === 'complete' ? 50 : 0;
+      const ocrContribution = Math.floor(currentOcrProgress * 0.5);
+      setOverallProgress(uploadContribution + ocrContribution);
     }
-  }, [progress, onConversionComplete, sessionId]);
+  }, [progress, onConversionComplete, sessionId, uploadStatus]);
 
   const handleFileSelect = async (file: File) => {
     setSelectedFile(file);
@@ -183,19 +190,22 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         setUploadPercentage(10);
         setOverallProgress(5); // Upload is first 50% of overall process
         
-        // Simulate upload progress more accurately
+        // Simulate upload progress - ONLY for the upload phase
         progressInterval = setInterval(() => {
           setUploadPercentage(prev => {
-            const newProgress = prev < 50 ? prev + Math.random() * 8 :
-                               prev < 75 ? prev + Math.random() * 4 :
-                               prev < 90 ? prev + Math.random() * 2 :
-                               prev + Math.random() * 0.5;
+            if (prev >= 95) return prev; // Stop at 95% until actual response
+            const increment = prev < 50 ? Math.random() * 8 :
+                             prev < 75 ? Math.random() * 4 :
+                             prev < 90 ? Math.random() * 2 :
+                             Math.random() * 0.5;
+            
+            const newProgress = Math.min(95, prev + increment);
             
             // Update overall progress (upload is 50% of total)
             setOverallProgress(Math.floor(newProgress * 0.5));
             return newProgress;
           });
-        }, 800);
+        }, 600);
         
         const uploadResponse = await fetch(uploadUrl, {
           method: 'POST',
@@ -220,6 +230,7 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         
         setUploadProgress('Upload complete, processing PDF...');
         setOcrStatus('processing'); // Start OCR phase
+        setOverallProgress(50); // Upload complete = 50%
         const uploadResult = await uploadResponse.json();
         console.log('Upload result:', uploadResult);
         
@@ -231,7 +242,9 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         
         // Check if processing is complete or we need to poll for progress
         if (uploadResult.downloadUrl) {
+          // Processing completed immediately - set OCR to complete
           setOcrStatus('complete');
+          setOcrProgress(100);
           setOverallProgress(100);
           setDownloadUrl(uploadResult.downloadUrl);
           setCurrentStep('complete');
@@ -245,7 +258,7 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
           }
         } else {
           // Continue with progress polling for OCR
-          setUploadProgress('OCR processing started...');
+          setUploadProgress('Upload complete - starting OCR...');
           console.log('Waiting for OCR processing, session:', uploadResult.sessionId);
         }
         
@@ -291,6 +304,7 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
     setUploadStatus('idle');
     setOcrStatus('idle');
     setOverallProgress(0);
+    setOcrProgress(0);
     
     resetProgress();
     resetAnalysis();
@@ -475,7 +489,7 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
                 <>
                   <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
                     <div className="bg-blue-600 h-2 rounded-full transition-all duration-500" style={{ 
-                      width: `${progress.progress || 0}%` 
+                      width: `${ocrProgress}%` 
                     }}></div>
                   </div>
                   <p className="text-sm text-gray-600">{progress.message || 'Processing with Mistral AI...'}</p>
