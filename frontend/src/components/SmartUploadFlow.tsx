@@ -175,11 +175,15 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         
         setSessionId(uploadResult.sessionId);
         
-        // For now, complete immediately with test content
-        if (uploadResult.success && uploadResult.downloadUrl) {
+        // Check if this is real OCR processing or test content
+        if (uploadResult.success && uploadResult.downloadUrl && uploadResult.markdownLength < 300) {
+          // Likely test content, complete immediately
           setDownloadUrl(uploadResult.downloadUrl);
           setCurrentStep('complete');
-          console.log('Test conversion complete');
+          console.log('Test conversion complete immediately');
+        } else {
+          // Real OCR processing - let progress polling handle completion
+          console.log('Real OCR processing started, waiting for completion...');
         }
         
         setUploadProgress('');
