@@ -187,11 +187,14 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         }
         
         // Start OCR processing but don't wait for it - let progress polling handle it
+        console.log('Making OCR request to:', `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/upload`);
         fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/upload`, {
           method: 'POST',
           body: ocrFormData,
         }).then(async (ocrResponse) => {
-          console.log('OCR processing response:', ocrResponse.status);
+          console.log('OCR processing response status:', ocrResponse.status);
+          console.log('OCR processing response headers:', Object.fromEntries(ocrResponse.headers.entries()));
+          
           if (ocrResponse.ok) {
             const ocrResult = await ocrResponse.json();
             console.log('OCR processing complete:', ocrResult);
@@ -199,9 +202,14 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
               setDownloadUrl(ocrResult.downloadUrl);
               setCurrentStep('complete');
             }
+          } else {
+            const errorText = await ocrResponse.text();
+            console.error('OCR processing failed with status:', ocrResponse.status, 'Error:', errorText);
+            setError(`OCR processing failed: ${ocrResponse.status}`);
+            setCurrentStep('error');
           }
         }).catch((ocrError) => {
-          console.error('OCR processing error:', ocrError);
+          console.error('OCR processing network error:', ocrError);
           setError('OCR processing failed. Please try again.');
           setCurrentStep('error');
         });
