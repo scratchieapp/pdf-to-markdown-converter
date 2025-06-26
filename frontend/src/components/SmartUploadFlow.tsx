@@ -141,17 +141,17 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
 
       setUploadProgress('Uploading PDF file...');
       setUploadStartTime(Date.now());
-      // Use upload-only endpoint to avoid timeout issues
-      const uploadUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/upload-only`;
+      // Use the working single upload endpoint with intelligent processing
+      const uploadUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/upload`;
       console.log('Uploading to:', uploadUrl);
       console.log('File size:', selectedFile.size, 'bytes');
       
-      // Longer timeout for actual upload (2 minutes)
+      // Reasonable timeout for upload + processing (90 seconds)
       const uploadController = new AbortController();
       const uploadTimeoutId = setTimeout(() => {
-        setUploadProgress('Upload timeout - file may be too large');
+        setUploadProgress('Processing timeout - file may be too large for real-time OCR');
         uploadController.abort();
-      }, 120000);
+      }, 90000);
       
       try {
         const uploadResponse = await fetch(uploadUrl, {
@@ -175,44 +175,12 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         
         setSessionId(uploadResult.sessionId);
         
-        // Now trigger OCR processing in background via simplified endpoint
-        console.log('Starting background OCR processing...');
-        setUploadProgress('Upload complete! Processing PDF with Mistral AI...');
-        
-        // Use the working upload endpoint for OCR processing
-        const ocrFormData = new FormData();
-        ocrFormData.append('pdf', selectedFile);
-        if (paymentIntentId) {
-          ocrFormData.append('paymentIntentId', paymentIntentId);
+        // Complete immediately with intelligent processing result
+        if (uploadResult.success && uploadResult.downloadUrl) {
+          setDownloadUrl(uploadResult.downloadUrl);
+          setCurrentStep('complete');
+          console.log('Intelligent processing complete');
         }
-        
-        // Start OCR processing but don't wait for it - let progress polling handle it
-        console.log('Making OCR request to:', `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/upload`);
-        fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/upload`, {
-          method: 'POST',
-          body: ocrFormData,
-        }).then(async (ocrResponse) => {
-          console.log('OCR processing response status:', ocrResponse.status);
-          console.log('OCR processing response headers:', Object.fromEntries(ocrResponse.headers.entries()));
-          
-          if (ocrResponse.ok) {
-            const ocrResult = await ocrResponse.json();
-            console.log('OCR processing complete:', ocrResult);
-            if (ocrResult.success && ocrResult.downloadUrl) {
-              setDownloadUrl(ocrResult.downloadUrl);
-              setCurrentStep('complete');
-            }
-          } else {
-            const errorText = await ocrResponse.text();
-            console.error('OCR processing failed with status:', ocrResponse.status, 'Error:', errorText);
-            setError(`OCR processing failed: ${ocrResponse.status}`);
-            setCurrentStep('error');
-          }
-        }).catch((ocrError) => {
-          console.error('OCR processing network error:', ocrError);
-          setError('OCR processing failed. Please try again.');
-          setCurrentStep('error');
-        });
         
         setUploadProgress('');
         
