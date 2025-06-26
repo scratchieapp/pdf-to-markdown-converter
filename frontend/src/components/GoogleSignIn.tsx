@@ -9,9 +9,20 @@ interface GoogleSignInProps {
 const GoogleSignIn: React.FC<GoogleSignInProps> = ({ onSuccess, onError }) => {
   useEffect(() => {
     // Debug current URL and expected redirect URI
+    console.log('=== Google OAuth Debug Info ===');
     console.log('Current URL:', window.location.href);
     console.log('Origin:', window.location.origin);
+    console.log('Hostname:', window.location.hostname);
+    console.log('Protocol:', window.location.protocol);
     console.log('Google Client ID:', process.env.REACT_APP_GOOGLE_CLIENT_ID);
+    console.log('Google Client ID length:', process.env.REACT_APP_GOOGLE_CLIENT_ID?.length);
+    console.log('================================');
+    
+    // Check backend OAuth debug
+    fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/debug-oauth`)
+      .then(res => res.json())
+      .then(data => console.log('Backend OAuth Debug:', data))
+      .catch(err => console.error('Failed to fetch OAuth debug:', err));
   }, []);
 
   const handleSuccess = (credentialResponse: CredentialResponse) => {
