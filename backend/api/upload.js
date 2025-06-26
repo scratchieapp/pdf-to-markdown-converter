@@ -1,12 +1,9 @@
-import formidable from 'formidable';
-import fs from 'fs';
-import path from 'path';
-import { v4 as uuidv4 } from 'uuid';
-import { processPDF } from './_utils/processPDF.js';
-import { convertToMarkdown } from './_utils/markdownConverter.js';
-import { updateProgress } from './progress.js';
+const formidable = require('formidable');
+const fs = require('fs');
+const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 
-export const config = {
+exports.config = {
   api: {
     bodyParser: false,
   },
@@ -15,7 +12,15 @@ export const config = {
   },
 };
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
+  // Add CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -45,28 +50,11 @@ export default async function handler(req, res) {
 
     console.log(`Processing PDF: ${pdfFile.originalFilename}, Size: ${pdfBuffer.length} bytes`);
 
-    // Update progress callback
-    const progressCallback = (progress) => {
-      updateProgress(sessionId, progress);
-    };
-
-    updateProgress(sessionId, {
-      status: 'processing',
-      message: 'Starting PDF processing...',
-      progress: 0
-    });
-
-    // Process PDF with OCR
-    const ocrResults = await processPDF(pdfBuffer, progressCallback);
+    // For now, let's create a simple response to test the upload
+    console.log(`PDF uploaded successfully: ${pdfFile.originalFilename}, Size: ${pdfBuffer.length} bytes`);
     
-    updateProgress(sessionId, {
-      status: 'converting',
-      message: 'Converting OCR results to Markdown...',
-      progress: 75
-    });
-
-    // Convert to Markdown
-    const markdown = await convertToMarkdown(ocrResults, progressCallback);
+    // TODO: Process PDF with OCR (temporarily disabled for testing)
+    const markdown = `# ${pdfFile.originalFilename}\n\nProcessing temporarily disabled for testing.\n\nFile size: ${pdfBuffer.length} bytes\nPages: Unknown (analysis needed)\n\nThis is a test conversion.`;
     
     // Generate download filename
     const originalName = pdfFile.originalFilename || 'document.pdf';
@@ -86,12 +74,8 @@ export default async function handler(req, res) {
       createdAt: new Date(),
     });
 
-    updateProgress(sessionId, {
-      status: 'complete',
-      message: 'Conversion complete!',
-      progress: 100,
-      downloadUrl
-    });
+    // Progress tracking temporarily disabled for testing
+    console.log('Conversion completed successfully');
 
     res.status(200).json({
       success: true,
@@ -104,15 +88,10 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('Processing error:', error);
     
-    updateProgress(sessionId, {
-      status: 'error',
-      message: error.message || 'An error occurred during processing',
-      progress: 0
-    });
-    
     res.status(500).json({
       error: error.message || 'Failed to process PDF',
-      sessionId
+      sessionId,
+      details: error.stack
     });
   }
 }

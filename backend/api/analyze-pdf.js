@@ -1,17 +1,26 @@
-import { PDFDocument } from 'pdf-lib';
-import formidable from 'formidable';
-import fs from 'fs';
-import { handleCors } from './_utils/cors.js';
+const { PDFDocument } = require('pdf-lib');
+const formidable = require('formidable');
+const fs = require('fs');
 
-export const config = {
+exports.config = {
   api: {
     bodyParser: false,
   },
 };
 
-export default async function handler(req, res) {
-  const corsResult = handleCors(req, res, ['POST']);
-  if (corsResult) return corsResult;
+module.exports = async function handler(req, res) {
+  // Add CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
   try {
     const form = formidable({
