@@ -1,5 +1,6 @@
 import React from 'react';
 import SmartUploadFlow from './components/SmartUploadFlow';
+import EnvDebugger from './components/EnvDebugger';
 
 function App() {
   return (
@@ -55,6 +56,8 @@ function App() {
           </div>
         </div>
       </div>
+      
+      <EnvDebugger />
     </div>
   );
 }

@@ -11,7 +11,18 @@ import DownloadButton from './DownloadButton';
 import { useFileAnalysis } from '../hooks/useFileAnalysis';
 import { useAuth, useAuthProvider, AuthContext } from '../hooks/useAuth';
 
-const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY || '');
+// Debug environment variables
+console.log('Stripe publishable key:', process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY ? 'Set' : 'Not set');
+console.log('Google client ID:', process.env.REACT_APP_GOOGLE_CLIENT_ID ? 'Set' : 'Not set');
+console.log('API URL:', process.env.REACT_APP_API_URL);
+
+const stripePublishableKey = process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY;
+
+if (!stripePublishableKey) {
+  console.error('Missing REACT_APP_STRIPE_PUBLISHABLE_KEY environment variable');
+}
+
+const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
 
 type FlowStep = 'upload' | 'analysis' | 'auth' | 'payment' | 'processing' | 'complete' | 'error';
 
@@ -192,6 +203,25 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
 
       case 'payment':
         if (!analysis) return null;
+        if (!stripePromise) {
+          return (
+            <div className="text-center py-8">
+              <div className="text-red-600 mb-4">
+                <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-lg font-semibold mt-2">Payment system not configured</p>
+                <p className="text-sm text-gray-600 mt-2">Please contact support or try again later.</p>
+              </div>
+              <button
+                onClick={handleReset}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Go Back
+              </button>
+            </div>
+          );
+        }
         return (
           <Elements stripe={stripePromise}>
             <PaymentForm
@@ -274,9 +304,14 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
 
 const SmartUploadFlow: React.FC<SmartUploadFlowProps> = (props) => {
   const authValue = useAuthProvider();
+  const googleClientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
+  
+  if (!googleClientId) {
+    console.error('Missing REACT_APP_GOOGLE_CLIENT_ID environment variable');
+  }
 
   return (
-    <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID || ''}>
+    <GoogleOAuthProvider clientId={googleClientId}>
       <AuthContext.Provider value={authValue}>
         <SmartUploadFlowContent {...props} />
       </AuthContext.Provider>
