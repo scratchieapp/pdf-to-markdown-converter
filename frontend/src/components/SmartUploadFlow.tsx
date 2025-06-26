@@ -135,32 +135,49 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
 
       const uploadUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/upload`;
       console.log('Uploading to:', uploadUrl);
+      console.log('File size:', selectedFile.size, 'bytes');
       
-      const response = await fetch(uploadUrl, {
-        method: 'POST',
-        body: formData,
-      });
-
-      console.log('Upload response:', response.status);
-
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.error('Upload failed:', errorData);
-        throw new Error('Conversion failed');
+      // Add timeout for upload (5 minutes)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 300000);
+      
+      try {
+        const response = await fetch(uploadUrl, {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeoutId);
+        console.log('Upload response:', response.status);
+        
+        if (!response.ok) {
+          const errorData = await response.text();
+          console.error('Upload failed:', errorData);
+          throw new Error(`Upload failed: ${errorData}`);
+        }
+        
+        const result = await response.json();
+        console.log('Upload result:', result);
+        
+        setSessionId(result.sessionId);
+        
+        // For serverless/test mode, the conversion is instant
+        if (result.success && result.downloadUrl) {
+          setDownloadUrl(result.downloadUrl);
+          setCurrentStep('complete');
+          console.log('Conversion complete immediately');
+        }
+        // Otherwise, polling will handle progress updates and completion detection
+        
+      } catch (uploadError) {
+        clearTimeout(timeoutId);
+        if (uploadError.name === 'AbortError') {
+          console.error('Upload timeout after 5 minutes');
+          throw new Error('Upload timeout - file may be too large');
+        }
+        throw uploadError;
       }
-
-      const result = await response.json();
-      console.log('Upload result:', result);
-      
-      setSessionId(result.sessionId);
-      
-      // For serverless/test mode, the conversion is instant
-      if (result.success && result.downloadUrl) {
-        setDownloadUrl(result.downloadUrl);
-        setCurrentStep('complete');
-        console.log('Conversion complete immediately');
-      }
-      // Otherwise, polling will handle progress updates and completion detection
 
     } catch (err) {
       console.error('Conversion error:', err);
