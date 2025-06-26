@@ -17,31 +17,21 @@ function App() {
       {/* Hero Section */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-4xl mx-auto px-4 py-16 text-center">
-          <div className="flex justify-between items-start mb-8">
-            <div></div>
-            <div className="flex-1">
-              <h1 className="text-4xl font-bold text-gray-900 mb-4">
-                The No-Nonsense PDF to Markdown Converter
-              </h1>
-              <p className="text-xl text-gray-600 mb-2">
-                Powered by Mistral AI • Convert 500-page documents in minutes
-              </p>
-              <p className="text-lg text-gray-500">
-                <span className="text-green-600 font-semibold">Free trial: 10 pages</span>
-                {' • '}
-                <span className="text-blue-600 font-semibold">Full service: $5/document</span>
-              </p>
-            </div>
-            <button
-              onClick={() => setShowContactPage(true)}
-              className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center"
-            >
-              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-              Contact Us
-            </button>
-          </div>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+            The No-Nonsense PDF to Markdown Converter
+          </h1>
+          <p className="text-xl text-gray-600 mb-2">
+            Powered by Mistral AI • Convert 500-page documents in minutes
+          </p>
+          <p className="text-lg text-gray-500">
+            <span className="text-green-600 font-semibold">Free trial: 10 pages</span>
+            {' • '}
+            <span className="text-orange-600 font-semibold">Launch Special: $3/document</span>
+            <span className="text-gray-400 line-through ml-1">$5</span>
+          </p>
+          <p className="text-sm text-orange-600 font-medium mt-1">
+            🚀 40% off through July 2025
+          </p>
         </div>
       </div>
 
