@@ -40,6 +40,7 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<string>('');
 
   const { analysis, isAnalyzing, error: analysisError, analyzeFile, reset: resetAnalysis } = useFileAnalysis();
   const { login } = useAuth();
@@ -115,12 +116,14 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
       
       // Set processing step now that we're starting
       setCurrentStep('processing');
+      setUploadProgress('Preparing upload...');
       
       const formData = new FormData();
       formData.append('pdf', selectedFile);
       
       if (isFree) {
         // Mark free trial as used
+        setUploadProgress('Updating free trial status...');
         const token = localStorage.getItem('auth_token');
         if (token) {
           console.log('Marking free trial as used...');
@@ -135,6 +138,7 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         formData.append('paymentIntentId', paymentIntentId);
       }
 
+      setUploadProgress('Uploading PDF file...');
       const uploadUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/upload`;
       console.log('Uploading to:', uploadUrl);
       console.log('File size:', selectedFile.size, 'bytes');
@@ -159,10 +163,12 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
           throw new Error(`Upload failed: ${errorData}`);
         }
         
+        setUploadProgress('Processing response...');
         const result = await response.json();
         console.log('Upload result:', result);
         
         setSessionId(result.sessionId);
+        setUploadProgress('Upload complete! Processing PDF...');
         
         // Check if conversion completed immediately (test mode)
         if (result.success && result.downloadUrl && result.markdownLength < 200) {
@@ -179,8 +185,10 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         clearTimeout(timeoutId);
         if (uploadError.name === 'AbortError') {
           console.error('Upload timeout after 5 minutes');
+          setUploadProgress('Upload timeout - file may be too large');
           throw new Error('Upload timeout - file may be too large');
         }
+        setUploadProgress(`Upload failed: ${uploadError.message}`);
         throw uploadError;
       }
 
@@ -188,6 +196,7 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
       console.error('Conversion error:', err);
       setError('Conversion failed. Please try again.');
       setCurrentStep('error');
+      setUploadProgress('');
     }
   };
 
@@ -198,6 +207,7 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
     setDownloadUrl(null);
     setPaymentIntentId(null);
     setSessionId(null);
+    setUploadProgress('');
     resetProgress();
     resetAnalysis();
   };
@@ -303,21 +313,41 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
       case 'processing':
         console.log('Rendering processing step, progress:', progress);
         console.log('Session ID:', sessionId);
+        console.log('Upload progress:', uploadProgress);
         return (
           <div className="text-center py-8">
-            <ProgressBar
-              progress={progress.progress}
-              message={progress.message || 'Processing your PDF...'}
-              currentPage={undefined}
-              totalPages={undefined}
-            />
-            {progress.status === 'idle' && (
-              <div className="mt-4">
-                <p className="text-sm text-gray-500">
-                  {sessionId ? `Starting conversion... Session: ${sessionId}` : 'Uploading your PDF...'}
-                </p>
-                {!sessionId && (
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mt-4"></div>
+            {/* Upload Progress Section */}
+            {!sessionId && (
+              <div className="mb-6">
+                <div className="text-blue-600 mb-2">
+                  <svg className="w-8 h-8 mx-auto animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Uploading PDF</h3>
+                <p className="text-sm text-gray-600">{uploadProgress || 'Preparing upload...'}</p>
+                <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
+                  <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+                </div>
+              </div>
+            )}
+            
+            {/* OCR Processing Section */}
+            {sessionId && (
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Processing with Mistral AI</h3>
+                <ProgressBar
+                  progress={progress.progress}
+                  message={progress.message || 'Converting PDF to Markdown...'}
+                  currentPage={undefined}
+                  totalPages={undefined}
+                />
+                {progress.status === 'idle' && (
+                  <div className="mt-4">
+                    <p className="text-sm text-gray-500">
+                      Starting OCR processing... Session: {sessionId.substring(0, 8)}...
+                    </p>
+                  </div>
                 )}
               </div>
             )}

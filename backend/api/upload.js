@@ -82,8 +82,8 @@ module.exports = async function handler(req, res) {
     console.log('Payment intent ID:', paymentIntentId);
     
     try {
-      // Re-enable OCR processing
-      const skipOCR = false; // OCR processing enabled
+      // Temporarily disable OCR to test upload progress
+      const skipOCR = true; // OCR processing disabled for debugging upload flow
       
       if (skipOCR) {
         console.log('Skipping OCR for debugging...');
