@@ -146,12 +146,12 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
       console.log('Uploading to:', uploadUrl);
       console.log('File size:', selectedFile.size, 'bytes');
       
-      // Extended timeout for full OCR processing (4.5 minutes)
+      // Shorter timeout for initial upload (2 minutes) - if it takes longer, it's likely a serverless timeout
       const uploadController = new AbortController();
       const uploadTimeoutId = setTimeout(() => {
-        setUploadProgress('Processing timeout - OCR took too long');
+        setUploadProgress('Upload timeout - file may be too large for serverless processing');
         uploadController.abort();
-      }, 270000);
+      }, 120000);
       
       let progressInterval: NodeJS.Timeout | null = null;
       
@@ -216,9 +216,9 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         }
         clearTimeout(uploadTimeoutId);
         if (uploadError.name === 'AbortError') {
-          console.error('Processing timeout after 4.5 minutes');
-          setUploadProgress('OCR processing timeout - file may be too complex');
-          throw new Error('OCR processing timeout - file may be too complex');
+          console.error('Upload timeout after 2 minutes');
+          setUploadProgress('Upload timeout - serverless function limit reached');
+          throw new Error('Upload timeout - file may be too large for current infrastructure');
         }
         setUploadProgress(`Upload failed: ${uploadError.message}`);
         throw uploadError;
@@ -375,15 +375,15 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
                     OCR processing in progress... Large files may take several minutes.
                   </p>
                 )}
-                {uploadStartTime && (Date.now() - uploadStartTime) > 120000 && (
+                {uploadStartTime && (Date.now() - uploadStartTime) > 90000 && (
                   <button
                     onClick={() => {
-                      setError('Processing timeout - OCR took too long for this PDF');
+                      setError('Upload timeout - file may be too large for serverless processing');
                       setCurrentStep('error');
                     }}
                     className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700"
                   >
-                    Cancel Processing
+                    Cancel Upload
                   </button>
                 )}
               </div>

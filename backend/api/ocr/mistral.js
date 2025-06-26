@@ -24,7 +24,7 @@ async function callMistralOCR(pdfBuffer, filename) {
           'Authorization': `Bearer ${process.env.MISTRAL_API_KEY}`,
           'Content-Type': 'application/json'
         },
-        timeout: 300000
+        timeout: 60000
       }
     );
 

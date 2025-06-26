@@ -18,7 +18,7 @@ exports.config = {
     bodyParser: false,
   },
   functions: {
-    maxDuration: 300, // 5 minutes for OCR processing
+    maxDuration: 120, // 2 minutes - faster timeout to prevent hanging
   },
 };
 
@@ -37,13 +37,19 @@ module.exports = async function handler(req, res) {
 
   const sessionId = uuidv4();
   
+  // Add overall timeout to prevent hanging
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('Function timeout - processing took too long')), 110000); // 110 seconds
+  });
+  
   try {
-    const form = formidable({
-      maxFileSize: 50 * 1024 * 1024, // 50MB
-      filter: ({ mimetype }) => {
-        return mimetype && mimetype.includes('pdf');
-      },
-    });
+    const processFile = async () => {
+      const form = formidable({
+        maxFileSize: 50 * 1024 * 1024, // 50MB
+        filter: ({ mimetype }) => {
+          return mimetype && mimetype.includes('pdf');
+        },
+      });
 
     const [fields, files] = await form.parse(req);
     
@@ -92,13 +98,13 @@ module.exports = async function handler(req, res) {
         progress: 30
       });
       
-      // Add timeout for OCR (4 minutes to stay under 5-minute Vercel limit)
+      // Add timeout for OCR (90 seconds to stay under function limit)
       const ocrPromise = callMistralOCR(pdfBuffer, pdfFile.originalFilename);
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('OCR processing timeout')), 240000)
+      const ocrTimeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('OCR processing timeout')), 90000)
       );
       
-      const ocrResult = await Promise.race([ocrPromise, timeoutPromise]);
+      const ocrResult = await Promise.race([ocrPromise, ocrTimeoutPromise]);
       
       progressModule.updateProgress(sessionId, {
         status: 'processing',
@@ -154,13 +160,19 @@ module.exports = async function handler(req, res) {
     
     console.log('Conversion completed successfully');
 
-    res.status(200).json({
-      success: true,
-      sessionId,
-      downloadUrl,
-      filename,
-      markdownLength: markdown.length
-    });
+      return {
+        success: true,
+        sessionId,
+        downloadUrl,
+        filename,
+        markdownLength: markdown.length
+      };
+    };
+
+    // Race between processing and timeout
+    const result = await Promise.race([processFile(), timeoutPromise]);
+    
+    res.status(200).json(result);
 
   } catch (error) {
     console.error('Processing error:', error);
