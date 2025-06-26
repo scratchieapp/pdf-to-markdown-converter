@@ -3,6 +3,9 @@ const { convertToMarkdown } = require('./ocr/markdownConverter');
 const path = require('path');
 
 exports.config = {
+  api: {
+    bodyParser: true, // Enable JSON body parsing
+  },
   functions: {
     maxDuration: 300, // 5 minutes for OCR processing
   },
@@ -21,11 +24,20 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  console.log('OCR processing request received:', {
+    method: req.method,
+    body: req.body,
+    headers: req.headers['content-type']
+  });
+
   const { sessionId } = req.body;
 
   if (!sessionId) {
+    console.error('No session ID provided:', req.body);
     return res.status(400).json({ error: 'Session ID required' });
   }
+
+  console.log('Processing OCR for session:', sessionId);
 
   try {
     // Get PDF from cache
