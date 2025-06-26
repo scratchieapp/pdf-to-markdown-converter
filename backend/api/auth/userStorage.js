@@ -1,6 +1,10 @@
 // Shared in-memory user storage
 // In production, replace this with a proper database
-const users = new Map();
+// Using global to persist across function invocations in the same container
+if (!global.users) {
+  global.users = new Map();
+}
+const users = global.users;
 
 const getUser = (userId) => users.get(userId);
 

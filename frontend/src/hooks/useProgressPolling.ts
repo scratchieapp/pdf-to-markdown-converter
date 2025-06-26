@@ -51,6 +51,13 @@ export const useProgressPolling = (sessionId: string | null, enabled: boolean = 
   useEffect(() => {
     if (!sessionId || !enabled) return;
 
+    // For serverless, check if we already have a download URL
+    // This means the conversion is complete
+    if (progress.downloadUrl) {
+      console.log('Progress already has downloadUrl, skipping polling');
+      return;
+    }
+
     let intervalId: NodeJS.Timeout;
     let shouldContinue = true;
 
@@ -76,7 +83,7 @@ export const useProgressPolling = (sessionId: string | null, enabled: boolean = 
         clearInterval(intervalId);
       }
     };
-  }, [sessionId, enabled, pollProgress]);
+  }, [sessionId, enabled, pollProgress, progress.downloadUrl]);
 
   const resetProgress = useCallback(() => {
     setProgress({

@@ -148,9 +148,14 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
       console.log('Upload result:', result);
       
       setSessionId(result.sessionId);
-      setDownloadUrl(result.downloadUrl);
       
-      // The polling will handle progress updates and completion detection
+      // For serverless/test mode, the conversion is instant
+      if (result.success && result.downloadUrl) {
+        setDownloadUrl(result.downloadUrl);
+        setCurrentStep('complete');
+        console.log('Conversion complete immediately');
+      }
+      // Otherwise, polling will handle progress updates and completion detection
 
     } catch (err) {
       console.error('Conversion error:', err);
