@@ -6,7 +6,6 @@ import FileUpload from './FileUpload';
 import FileAnalysis from './FileAnalysis';
 import GoogleSignIn from './GoogleSignIn';
 import PaymentForm from './PaymentForm';
-import ProgressBar from './ProgressBar';
 import DownloadButton from './DownloadButton';
 import { useFileAnalysis } from '../hooks/useFileAnalysis';
 import { useAuth, useAuthProvider, AuthContext } from '../hooks/useAuth';
