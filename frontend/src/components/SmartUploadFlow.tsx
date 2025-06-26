@@ -209,9 +209,20 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         
         if (!uploadResponse.ok) {
           setUploadStatus('error');
-          const errorData = await uploadResponse.text();
-          console.error('Upload failed with status:', uploadResponse.status, 'Data:', errorData);
-          throw new Error(`Upload failed (${uploadResponse.status}): ${errorData}`);
+          try {
+            const errorData = await uploadResponse.json();
+            console.error('Upload failed with status:', uploadResponse.status, 'Data:', errorData);
+            
+            // Check if a refund was issued
+            if (errorData.refundIssued) {
+              throw new Error(`Processing failed but your payment has been automatically refunded. ${errorData.error || 'Please try again.'}`);
+            } else {
+              throw new Error(`Upload failed (${uploadResponse.status}): ${errorData.error || 'Unknown error'}`);
+            }
+          } catch (parseError) {
+            const errorText = await uploadResponse.text();
+            throw new Error(`Upload failed (${uploadResponse.status}): ${errorText}`);
+          }
         }
         
         // Start OCR phase
@@ -271,8 +282,8 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         setOcrStatus('idle');
         if (uploadError.name === 'AbortError') {
           console.error('Upload timeout after 2 minutes');
-          setUploadProgress('Upload timeout - serverless function limit reached');
-          throw new Error('Upload timeout - file may be too large for current infrastructure');
+          setUploadProgress('Processing timeout - automatic refund issued');
+          throw new Error('Processing timeout - your payment has been automatically refunded. Please try a smaller file.');
         }
         setUploadProgress(`Upload failed: ${uploadError.message}`);
         throw uploadError;

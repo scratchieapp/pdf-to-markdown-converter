@@ -87,6 +87,9 @@ module.exports = async function handler(req, res) {
     const paymentIntentId = fields.paymentIntentId ? fields.paymentIntentId[0] : null;
     console.log('Payment intent ID:', paymentIntentId);
     
+    // Store payment ID globally for timeout refund handling
+    global.currentPaymentIntentId = paymentIntentId;
+    
     try {
       // Process PDF with OCR for all file sizes
       const fileSizeInMB = pdfBuffer.length / (1024 * 1024);
@@ -118,18 +121,37 @@ module.exports = async function handler(req, res) {
     } catch (ocrError) {
       console.error('OCR processing failed:', ocrError);
       
-      // Provide different error messages based on the error type
-      let errorMessage = 'OCR processing failed. Please try again or contact support.';
-      if (ocrError.message.includes('timeout')) {
-        errorMessage = 'OCR processing took too long. Your PDF may be too large or complex. Please try with a smaller file or contact support.';
-      } else if (ocrError.message.includes('401')) {
-        errorMessage = 'OCR service authentication failed. Please contact support.';
-      } else if (ocrError.message.includes('422')) {
-        errorMessage = 'Your PDF format is not supported or may be corrupted. Please try with a different PDF.';
+      // If this was a paid conversion, automatically refund the customer
+      if (paymentIntentId) {
+        console.log('Attempting automatic refund for failed conversion:', paymentIntentId);
+        try {
+          const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+          const refund = await stripe.refunds.create({
+            payment_intent: paymentIntentId,
+            reason: 'requested_by_customer'
+          });
+          console.log('Automatic refund issued:', refund.id);
+        } catch (refundError) {
+          console.error('Failed to issue automatic refund:', refundError);
+        }
       }
       
-      // Fallback content with helpful error message
-      markdown = `# ${pdfFile.originalFilename}\n\n⚠️ **OCR Processing Failed**\n\n${errorMessage}\n\n**Technical Details:**\n- File size: ${pdfBuffer.length} bytes\n- Error: ${ocrError.message}\n- Payment ID: ${paymentIntentId || 'Free trial'}\n\nYour payment was processed successfully. Please contact support for assistance.`;
+      // Provide different error messages based on the error type
+      let errorMessage = 'OCR processing failed. We\'ve automatically refunded your payment.';
+      if (ocrError.message.includes('timeout')) {
+        errorMessage = 'OCR processing took too long for your PDF. We\'ve automatically refunded your payment. Please try with a smaller file.';
+      } else if (ocrError.message.includes('401')) {
+        errorMessage = 'OCR service temporarily unavailable. We\'ve automatically refunded your payment. Please try again later.';
+      } else if (ocrError.message.includes('422')) {
+        errorMessage = 'Your PDF format is not supported. We\'ve automatically refunded your payment. Please try with a different PDF.';
+      }
+      
+      // Fallback content with refund confirmation
+      const refundMessage = paymentIntentId ? 
+        '✅ **Automatic Refund Issued**\n\nWe\'ve automatically refunded your $5 payment. No action needed on your part.' :
+        '✅ **Free Trial**\n\nNo charge was made for this conversion.';
+      
+      markdown = `# ${pdfFile.originalFilename}\n\n⚠️ **Conversion Failed**\n\n${errorMessage}\n\n${refundMessage}\n\n**Technical Details:**\n- File size: ${pdfBuffer.length} bytes\n- Error: ${ocrError.message}\n- Payment ID: ${paymentIntentId || 'Free trial'}\n\nYou can try converting a different PDF or a smaller version of this file.`;
     }
     
     // Generate download filename
@@ -182,10 +204,26 @@ module.exports = async function handler(req, res) {
   } catch (error) {
     console.error('Processing error:', error);
     
+    // If this was a timeout or other processing error with a payment, refund it
+    if (error.message && error.message.includes('timeout') && global.currentPaymentIntentId) {
+      console.log('Processing timeout - attempting automatic refund:', global.currentPaymentIntentId);
+      try {
+        const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+        const refund = await stripe.refunds.create({
+          payment_intent: global.currentPaymentIntentId,
+          reason: 'requested_by_customer'
+        });
+        console.log('Automatic timeout refund issued:', refund.id);
+      } catch (refundError) {
+        console.error('Failed to issue timeout refund:', refundError);
+      }
+    }
+    
     res.status(500).json({
       error: error.message || 'Failed to process PDF',
       sessionId,
-      details: error.stack
+      details: error.stack,
+      refundIssued: !!global.currentPaymentIntentId
     });
   }
 }

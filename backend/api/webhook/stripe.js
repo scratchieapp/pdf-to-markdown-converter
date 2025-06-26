@@ -1,6 +1,6 @@
-import { getStripe } from '../_utils/stripe.js';
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
-export const config = {
+exports.config = {
   api: {
     bodyParser: {
       sizeLimit: '1mb',
@@ -8,13 +8,12 @@ export const config = {
   },
 };
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const stripe = getStripe();
     const sig = req.headers['stripe-signature'];
     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -36,14 +35,29 @@ export default async function handler(req, res) {
     switch (event.type) {
       case 'payment_intent.succeeded':
         const paymentIntent = event.data.object;
-        console.log('Payment succeeded:', paymentIntent.id);
+        console.log('✅ Payment succeeded:', paymentIntent.id, 'Amount:', paymentIntent.amount_received / 100);
         console.log('Payment metadata:', paymentIntent.metadata);
-        // Here you could trigger the PDF processing
         break;
 
       case 'payment_intent.payment_failed':
         const failedPayment = event.data.object;
-        console.log('Payment failed:', failedPayment.id);
+        console.log('❌ Payment failed:', failedPayment.id);
+        break;
+
+      case 'charge.dispute.created':
+        const dispute = event.data.object;
+        console.log('⚠️ Dispute created:', dispute.id, 'Amount:', dispute.amount / 100);
+        break;
+
+      case 'refund.created':
+        const refund = event.data.object;
+        console.log('💰 Automatic refund issued:', refund.id, 'Amount:', refund.amount / 100, 'Reason:', refund.reason);
+        console.log('Payment Intent:', refund.payment_intent);
+        break;
+
+      case 'refund.failed':
+        const failedRefund = event.data.object;
+        console.log('❌ Refund failed:', failedRefund.id, 'Payment Intent:', failedRefund.payment_intent);
         break;
 
       default:
@@ -54,11 +68,6 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('Webhook handler error:', error);
-    
-    if (error.message === 'STRIPE_SECRET_KEY not configured') {
-      return res.status(500).json({ error: 'Stripe not configured' });
-    }
-    
     res.status(500).json({ error: 'Webhook handler failed' });
   }
 }
