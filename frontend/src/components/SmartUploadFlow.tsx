@@ -42,6 +42,7 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<string>('');
   const [uploadStartTime, setUploadStartTime] = useState<number | null>(null);
+  const [uploadPercentage, setUploadPercentage] = useState<number>(0);
 
   const { analysis, isAnalyzing, error: analysisError, analyzeFile, reset: resetAnalysis } = useFileAnalysis();
   const { login } = useAuth();
@@ -141,7 +142,6 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
 
       setUploadProgress('Uploading PDF file...');
       setUploadStartTime(Date.now());
-      // Use the working single upload endpoint with intelligent processing
       const uploadUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/upload`;
       console.log('Uploading to:', uploadUrl);
       console.log('File size:', selectedFile.size, 'bytes');
@@ -153,38 +153,67 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         uploadController.abort();
       }, 270000);
       
+      let progressInterval: NodeJS.Timeout | null = null;
+      
       try {
+        // Upload with progress tracking
+        setUploadProgress('Starting upload...');
+        setUploadPercentage(10);
+        
+        // Simulate upload progress for better UX
+        progressInterval = setInterval(() => {
+          setUploadPercentage(prev => {
+            if (prev < 80) return prev + Math.random() * 10;
+            return prev;
+          });
+        }, 500);
+        
         const uploadResponse = await fetch(uploadUrl, {
           method: 'POST',
           body: formData,
           signal: uploadController.signal,
         });
         
+        if (progressInterval) clearInterval(progressInterval);
+        setUploadPercentage(100);
         clearTimeout(uploadTimeoutId);
-        console.log('Upload response:', uploadResponse.status);
+        console.log('Upload response status:', uploadResponse.status);
+        console.log('Upload response headers:', Object.fromEntries(uploadResponse.headers.entries()));
         
         if (!uploadResponse.ok) {
           const errorData = await uploadResponse.text();
-          console.error('Upload failed:', errorData);
-          throw new Error(`Upload failed: ${errorData}`);
+          console.error('Upload failed with status:', uploadResponse.status, 'Data:', errorData);
+          throw new Error(`Upload failed (${uploadResponse.status}): ${errorData}`);
         }
         
-        setUploadProgress('Processing response...');
+        setUploadProgress('Upload complete, processing PDF...');
         const uploadResult = await uploadResponse.json();
         console.log('Upload result:', uploadResult);
         
+        if (!uploadResult.success) {
+          throw new Error(uploadResult.error || 'Upload failed');
+        }
+        
         setSessionId(uploadResult.sessionId);
         
-        // Complete immediately with intelligent processing result
-        if (uploadResult.success && uploadResult.downloadUrl) {
+        // Check if processing is complete or we need to poll for progress
+        if (uploadResult.downloadUrl) {
           setDownloadUrl(uploadResult.downloadUrl);
           setCurrentStep('complete');
-          console.log('Intelligent processing complete');
+          console.log('Processing complete immediately');
+        } else {
+          // Continue with progress polling
+          setUploadProgress('OCR processing started...');
+          console.log('Waiting for OCR processing, session:', uploadResult.sessionId);
         }
         
         setUploadProgress('');
         
       } catch (uploadError: any) {
+        // Clear any ongoing progress interval
+        if (progressInterval) {
+          clearInterval(progressInterval);
+        }
         clearTimeout(uploadTimeoutId);
         if (uploadError.name === 'AbortError') {
           console.error('Processing timeout after 4.5 minutes');
@@ -212,6 +241,7 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
     setSessionId(null);
     setUploadProgress('');
     setUploadStartTime(null);
+    setUploadPercentage(0);
     resetProgress();
     resetAnalysis();
   };
@@ -336,8 +366,8 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
                   </p>
                 )}
                 <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
-                  <div className="bg-blue-600 h-2 rounded-full transition-all duration-1000" style={{ 
-                    width: uploadStartTime ? `${Math.min(90, (Date.now() - uploadStartTime) / 1000 * 3)}%` : '10%' 
+                  <div className="bg-blue-600 h-2 rounded-full transition-all duration-500" style={{ 
+                    width: `${uploadPercentage}%` 
                   }}></div>
                 </div>
                 {uploadStartTime && (Date.now() - uploadStartTime) > 30000 && (
