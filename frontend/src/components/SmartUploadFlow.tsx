@@ -98,7 +98,7 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
   const handlePaymentSuccess = async (paymentId: string) => {
     console.log('Payment successful, payment intent ID:', paymentId);
     setPaymentIntentId(paymentId);
-    setCurrentStep('processing');
+    // Don't set processing step until after upload starts
     await startConversion(false); // false = paid conversion
   };
 
@@ -110,6 +110,9 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
 
     try {
       console.log('Starting conversion...', { isFree, fileName: selectedFile.name });
+      
+      // Set processing step now that we're starting
+      setCurrentStep('processing');
       
       const formData = new FormData();
       formData.append('pdf', selectedFile);
@@ -287,9 +290,14 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
               totalPages={undefined}
             />
             {progress.status === 'idle' && (
-              <p className="text-sm text-gray-500 mt-4">
-                Starting conversion... Session: {sessionId || 'none'}
-              </p>
+              <div className="mt-4">
+                <p className="text-sm text-gray-500">
+                  {sessionId ? `Starting conversion... Session: ${sessionId}` : 'Uploading your PDF...'}
+                </p>
+                {!sessionId && (
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mt-4"></div>
+                )}
+              </div>
             )}
           </div>
         );
