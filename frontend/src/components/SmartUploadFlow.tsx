@@ -41,6 +41,7 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<string>('');
+  const [uploadStartTime, setUploadStartTime] = useState<number | null>(null);
 
   const { analysis, isAnalyzing, error: analysisError, analyzeFile, reset: resetAnalysis } = useFileAnalysis();
   const { login } = useAuth();
@@ -139,13 +140,17 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
       }
 
       setUploadProgress('Uploading PDF file...');
+      setUploadStartTime(Date.now());
       const uploadUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/upload`;
       console.log('Uploading to:', uploadUrl);
       console.log('File size:', selectedFile.size, 'bytes');
       
-      // Add timeout for upload (5 minutes)
+      // Add timeout for upload (2 minutes for upload, then we'll wait for OCR separately)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 300000);
+      const timeoutId = setTimeout(() => {
+        setUploadProgress('Upload taking longer than expected...');
+        controller.abort();
+      }, 120000);
       
       try {
         const response = await fetch(uploadUrl, {
@@ -208,6 +213,7 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
     setPaymentIntentId(null);
     setSessionId(null);
     setUploadProgress('');
+    setUploadStartTime(null);
     resetProgress();
     resetAnalysis();
   };
@@ -326,9 +332,30 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Uploading PDF</h3>
                 <p className="text-sm text-gray-600">{uploadProgress || 'Preparing upload...'}</p>
+                {uploadStartTime && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {Math.floor((Date.now() - uploadStartTime) / 1000)}s elapsed
+                  </p>
+                )}
                 <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
                   <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
                 </div>
+                {uploadStartTime && (Date.now() - uploadStartTime) > 30000 && (
+                  <p className="text-xs text-orange-600 mt-2">
+                    Upload taking longer than expected... This may indicate OCR processing has started.
+                  </p>
+                )}
+                {uploadStartTime && (Date.now() - uploadStartTime) > 60000 && (
+                  <button
+                    onClick={() => {
+                      setError('Upload timeout - please try again with a smaller PDF');
+                      setCurrentStep('error');
+                    }}
+                    className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700"
+                  >
+                    Cancel Upload
+                  </button>
+                )}
               </div>
             )}
             
