@@ -102,9 +102,14 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
   };
 
   const startConversion = async (isFree: boolean) => {
-    if (!selectedFile || !analysis) return;
+    if (!selectedFile || !analysis) {
+      console.error('Missing file or analysis:', { selectedFile, analysis });
+      return;
+    }
 
     try {
+      console.log('Starting conversion...', { isFree, fileName: selectedFile.name });
+      
       const formData = new FormData();
       formData.append('pdf', selectedFile);
       
@@ -112,31 +117,43 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         // Mark free trial as used
         const token = localStorage.getItem('auth_token');
         if (token) {
-          await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/auth/use-free-trial`, {
+          console.log('Marking free trial as used...');
+          const freeTrialResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/auth/use-free-trial`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` },
           });
+          console.log('Free trial response:', freeTrialResponse.status);
         }
       } else if (paymentIntentId) {
         formData.append('paymentIntentId', paymentIntentId);
       }
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/upload`, {
+      const uploadUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/upload`;
+      console.log('Uploading to:', uploadUrl);
+      
+      const response = await fetch(uploadUrl, {
         method: 'POST',
         body: formData,
       });
 
+      console.log('Upload response:', response.status);
+
       if (!response.ok) {
+        const errorData = await response.text();
+        console.error('Upload failed:', errorData);
         throw new Error('Conversion failed');
       }
 
       const result = await response.json();
+      console.log('Upload result:', result);
+      
       setSessionId(result.sessionId);
       setDownloadUrl(result.downloadUrl);
       
       // The polling will handle progress updates and completion detection
 
     } catch (err) {
+      console.error('Conversion error:', err);
       setError('Conversion failed. Please try again.');
       setCurrentStep('error');
     }

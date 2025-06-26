@@ -17,18 +17,28 @@ export const useProgressPolling = (sessionId: string | null, enabled: boolean = 
   });
 
   const pollProgress = useCallback(async (): Promise<boolean> => {
-    if (!sessionId || !enabled) return false;
+    if (!sessionId || !enabled) {
+      console.log('Progress polling skipped:', { sessionId, enabled });
+      return false;
+    }
 
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/progress?sessionId=${sessionId}`);
+      const url = `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/progress?sessionId=${sessionId}`;
+      console.log('Polling progress:', url);
+      
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
+        console.log('Progress data:', data);
         setProgress(data);
         
         // Stop polling if complete or error
         if (data.status === 'complete' || data.status === 'error') {
+          console.log('Stopping polling - status:', data.status);
           return false; // Signal to stop polling
         }
+      } else {
+        console.error('Progress poll failed:', response.status);
       }
     } catch (error) {
       console.error('Error polling progress:', error);
