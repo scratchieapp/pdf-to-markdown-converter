@@ -30,6 +30,9 @@ export const useFileAnalysis = (): UseFileAnalysisResult => {
     setAnalysis(null);
 
     try {
+      console.log('Analyzing file:', file.name, 'Size:', file.size, 'Type:', file.type);
+      console.log('API URL:', `${API_URL}/api/analyze-pdf`);
+      
       const formData = new FormData();
       formData.append('pdf', file);
 
@@ -38,14 +41,25 @@ export const useFileAnalysis = (): UseFileAnalysisResult => {
         body: formData,
       });
 
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to analyze PDF');
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
+        }
+        console.error('API Error:', errorData);
+        throw new Error(errorData.error || `Failed to analyze PDF (${response.status})`);
       }
 
       const data = await response.json();
+      console.log('Analysis result:', data);
       setAnalysis(data.analysis);
     } catch (err) {
+      console.error('Analysis error:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to analyze PDF';
       setError(errorMessage);
     } finally {

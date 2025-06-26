@@ -1,6 +1,7 @@
 import React from 'react';
 import SmartUploadFlow from './components/SmartUploadFlow';
 import EnvDebugger from './components/EnvDebugger';
+import ApiHealthCheck from './components/ApiHealthCheck';
 
 function App() {
   return (
@@ -57,6 +58,7 @@ function App() {
         </div>
       </div>
       
+      <ApiHealthCheck />
       <EnvDebugger />
     </div>
   );

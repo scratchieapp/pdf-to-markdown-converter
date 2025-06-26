@@ -1,11 +1,13 @@
+import { handleCors } from './_utils/cors.js';
+
 export default function handler(req, res) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  const corsResult = handleCors(req, res, ['GET']);
+  if (corsResult) return corsResult;
   
   res.status(200).json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    service: 'pdf-to-markdown-api'
+    service: 'pdf-to-markdown-api',
+    environment: process.env.NODE_ENV || 'development'
   });
 }

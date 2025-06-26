@@ -1,6 +1,7 @@
 import { PDFDocument } from 'pdf-lib';
 import formidable from 'formidable';
 import fs from 'fs';
+import { handleCors } from './_utils/cors.js';
 
 export const config = {
   api: {
@@ -9,9 +10,8 @@ export const config = {
 };
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  const corsResult = handleCors(req, res, ['POST']);
+  if (corsResult) return corsResult;
 
   try {
     const form = formidable({
