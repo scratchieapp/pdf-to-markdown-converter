@@ -177,10 +177,20 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
       let progressInterval: NodeJS.Timeout | null = null;
       
       try {
-        // Start upload phase - no fake progress, just honest status
+        // Start upload phase - show upload UI immediately
+        console.log('Setting upload status to uploading');
         setUploadStatus('uploading');
         setUploadProgress('Uploading PDF file...');
-        setUploadPercentage(0); // Start at 0 until we get real feedback
+        setUploadPercentage(10); // Start at 10% to show something is happening
+        setUploadStartTime(Date.now());
+        
+        // Simple progress simulation for upload only - stops at 90%
+        progressInterval = setInterval(() => {
+          setUploadPercentage(prev => {
+            if (prev >= 90) return prev; // Stop at 90% until response
+            return Math.min(90, prev + Math.random() * 10);
+          });
+        }, 800);
         
         const uploadResponse = await fetch(uploadUrl, {
           method: 'POST',
@@ -188,7 +198,8 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
           signal: uploadController.signal,
         });
         
-        // Upload completed - set to 100%
+        // Upload completed - stop simulation and set to 100%
+        if (progressInterval) clearInterval(progressInterval);
         setUploadPercentage(100);
         setUploadStatus('complete');
         setUploadProgress('Upload complete');
@@ -204,6 +215,7 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         }
         
         // Start OCR phase
+        console.log('Setting OCR status to processing');
         setOcrStatus('processing');
         const uploadResult = await uploadResponse.json();
         console.log('Upload result:', uploadResult);
@@ -216,12 +228,24 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         
         // Check if processing is complete or we need to poll for progress
         if (uploadResult.downloadUrl) {
-          // Processing completed immediately - set OCR to complete
-          setOcrStatus('complete');
-          setOcrProgress(100);
-          setDownloadUrl(uploadResult.downloadUrl);
-          setCurrentStep('complete');
-          console.log('Processing complete immediately');
+          // Processing completed immediately - show OCR briefly then complete
+          console.log('Processing complete immediately - showing OCR briefly');
+          
+          // Show OCR processing for a moment so user sees it happened
+          let progress = 0;
+          const progressInterval = setInterval(() => {
+            progress += 25;
+            setOcrProgress(progress);
+            if (progress >= 100) {
+              clearInterval(progressInterval);
+              setTimeout(() => {
+                setOcrStatus('complete');
+                setDownloadUrl(uploadResult.downloadUrl);
+                setCurrentStep('complete');
+                console.log('Transitioning to complete screen');
+              }, 500);
+            }
+          }, 200); // Update every 200ms
           
           // Store markdown content for direct download
           if (uploadResult.markdownContent && uploadResult.filename) {
@@ -238,11 +262,13 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         setUploadProgress('');
         
       } catch (uploadError: any) {
-        // Clear any ongoing progress interval
+        // Clear any ongoing progress intervals
         if (progressInterval) {
           clearInterval(progressInterval);
         }
         clearTimeout(uploadTimeoutId);
+        setUploadStatus('error');
+        setOcrStatus('idle');
         if (uploadError.name === 'AbortError') {
           console.error('Upload timeout after 2 minutes');
           setUploadProgress('Upload timeout - serverless function limit reached');
@@ -381,6 +407,7 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         );
 
       case 'processing':
+        console.log('Rendering processing step - uploadStatus:', uploadStatus, 'ocrStatus:', ocrStatus);
         return (
           <div className="text-center py-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-8">Converting PDF to Markdown</h2>
