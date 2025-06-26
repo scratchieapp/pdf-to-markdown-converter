@@ -77,25 +77,37 @@ module.exports = async function handler(req, res) {
     
     let markdown;
     
+    // Check if this is a paid conversion
+    const paymentIntentId = fields.paymentIntentId ? fields.paymentIntentId[0] : null;
+    console.log('Payment intent ID:', paymentIntentId);
+    
     try {
-      // Process PDF with OCR
-      console.log('Calling Mistral OCR...');
-      progressModule.updateProgress(sessionId, {
-        status: 'processing',
-        message: 'Processing PDF with Mistral AI...',
-        progress: 30
-      });
+      // For now, skip OCR for debugging
+      const skipOCR = true; // Temporary flag
       
-      const ocrResult = await callMistralOCR(pdfBuffer, pdfFile.originalFilename);
-      
-      progressModule.updateProgress(sessionId, {
-        status: 'processing',
-        message: 'Converting to Markdown...',
-        progress: 70
-      });
-      
-      // Convert OCR result to markdown
-      markdown = await convertToMarkdown([{ content: ocrResult, pageRange: [0, -1] }], sessionId);
+      if (skipOCR) {
+        console.log('Skipping OCR for debugging...');
+        markdown = `# ${pdfFile.originalFilename}\n\nTest conversion successful!\n\nFile size: ${pdfBuffer.length} bytes\nPayment ID: ${paymentIntentId || 'Free trial'}\n\nOCR processing temporarily disabled for debugging.`;
+      } else {
+        // Process PDF with OCR
+        console.log('Calling Mistral OCR...');
+        progressModule.updateProgress(sessionId, {
+          status: 'processing',
+          message: 'Processing PDF with Mistral AI...',
+          progress: 30
+        });
+        
+        const ocrResult = await callMistralOCR(pdfBuffer, pdfFile.originalFilename);
+        
+        progressModule.updateProgress(sessionId, {
+          status: 'processing',
+          message: 'Converting to Markdown...',
+          progress: 70
+        });
+        
+        // Convert OCR result to markdown
+        markdown = await convertToMarkdown([{ content: ocrResult, pageRange: [0, -1] }], sessionId);
+      }
       
     } catch (ocrError) {
       console.error('OCR processing failed:', ocrError);
