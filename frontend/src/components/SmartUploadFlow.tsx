@@ -13,7 +13,9 @@ import { useAuth, useAuthProvider, AuthContext } from '../hooks/useAuth';
 import { useProgressPolling } from '../hooks/useProgressPolling';
 
 // Debug environment variables
-console.log('Stripe publishable key:', process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY ? 'Set' : 'Not set');
+const stripeKey = process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY;
+const isTestMode = stripeKey?.startsWith('pk_test_');
+console.log('Stripe publishable key:', stripeKey ? `Set (${isTestMode ? 'TEST' : 'LIVE'} mode)` : 'Not set');
 console.log('Google client ID:', process.env.REACT_APP_GOOGLE_CLIENT_ID ? 'Set' : 'Not set');
 console.log('API URL:', process.env.REACT_APP_API_URL);
 
