@@ -172,7 +172,7 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         }
         // Otherwise, polling will handle progress updates and completion detection
         
-      } catch (uploadError) {
+      } catch (uploadError: any) {
         clearTimeout(timeoutId);
         if (uploadError.name === 'AbortError') {
           console.error('Upload timeout after 5 minutes');
