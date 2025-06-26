@@ -1,6 +1,16 @@
 const { PDFDocument } = require('pdf-lib');
-const formidable = require('formidable').default || require('formidable');
 const fs = require('fs');
+
+// Handle formidable import for different versions
+let formidable;
+try {
+  // For newer versions where formidable exports as ES module
+  const formidableModule = require('formidable');
+  formidable = formidableModule.default || formidableModule;
+} catch (error) {
+  console.error('Failed to import formidable:', error);
+  throw new Error('Formidable module not available');
+}
 
 exports.config = {
   api: {
