@@ -33,7 +33,7 @@ export const useFileAnalysis = (): UseFileAnalysisResult => {
       const formData = new FormData();
       formData.append('pdf', file);
 
-      const response = await fetch(`${API_URL}/api/analyze/pdf`, {
+      const response = await fetch(`${API_URL}/api/analyze-pdf`, {
         method: 'POST',
         body: formData,
       });

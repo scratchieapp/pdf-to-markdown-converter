@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
@@ -10,6 +10,7 @@ import ProgressBar from './ProgressBar';
 import DownloadButton from './DownloadButton';
 import { useFileAnalysis } from '../hooks/useFileAnalysis';
 import { useAuth, useAuthProvider, AuthContext } from '../hooks/useAuth';
+import { useProgressPolling } from '../hooks/useProgressPolling';
 
 // Debug environment variables
 console.log('Stripe publishable key:', process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY ? 'Set' : 'Not set');
@@ -34,12 +35,25 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
   const [currentStep, setCurrentStep] = useState<FlowStep>('upload');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [progress, setProgress] = useState({ progress: 0, message: '', status: 'idle' });
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
   const { analysis, isAnalyzing, error: analysisError, analyzeFile, reset: resetAnalysis } = useFileAnalysis();
   const { login } = useAuth();
+  const { progress, resetProgress } = useProgressPolling(sessionId, currentStep === 'processing');
+
+  // Handle progress updates and completion
+  useEffect(() => {
+    if (progress.status === 'complete' && progress.downloadUrl) {
+      setDownloadUrl(progress.downloadUrl);
+      setCurrentStep('complete');
+      onConversionComplete?.(progress.downloadUrl);
+    } else if (progress.status === 'error') {
+      setError(progress.message || 'Conversion failed');
+      setCurrentStep('error');
+    }
+  }, [progress, onConversionComplete]);
 
   const handleFileSelect = async (file: File) => {
     setSelectedFile(file);
@@ -91,11 +105,8 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
     if (!selectedFile || !analysis) return;
 
     try {
-      setProgress({ progress: 10, message: 'Starting conversion...', status: 'processing' });
-
       const formData = new FormData();
       formData.append('pdf', selectedFile);
-      formData.append('sessionId', `session-${Date.now()}-${Math.random().toString(36).substring(7)}`);
       
       if (isFree) {
         // Mark free trial as used
@@ -120,9 +131,10 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
       }
 
       const result = await response.json();
+      setSessionId(result.sessionId);
       setDownloadUrl(result.downloadUrl);
-      setCurrentStep('complete');
-      onConversionComplete?.(result.downloadUrl);
+      
+      // The polling will handle progress updates and completion detection
 
     } catch (err) {
       setError('Conversion failed. Please try again.');
@@ -134,9 +146,10 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
     setCurrentStep('upload');
     setSelectedFile(null);
     setError(null);
-    setProgress({ progress: 0, message: '', status: 'idle' });
     setDownloadUrl(null);
     setPaymentIntentId(null);
+    setSessionId(null);
+    resetProgress();
     resetAnalysis();
   };
 
