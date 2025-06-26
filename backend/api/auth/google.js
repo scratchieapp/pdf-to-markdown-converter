@@ -1,18 +1,61 @@
-import { OAuth2Client } from 'google-auth-library';
-import { getUser, createUser } from '../_utils/userStorage.js';
-import { generateToken } from '../_utils/auth.js';
+const { OAuth2Client } = require('google-auth-library');
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-export default async function handler(req, res) {
+// In-memory user storage (replace with database in production)
+const users = new Map();
+
+const getUser = (userId) => users.get(userId);
+
+const createUser = (googleId, { email, name, picture }) => {
+  const user = {
+    id: googleId,
+    email,
+    name,
+    picture,
+    freeTrialUsed: false,
+    conversions: [],
+    createdAt: new Date(),
+  };
+  users.set(googleId, user);
+  return user;
+};
+
+const jwt = require('jsonwebtoken');
+
+const generateToken = (userId) => {
+  return jwt.sign(
+    { userId },
+    process.env.JWT_SECRET || 'your-secret-key',
+    { expiresIn: '7d' }
+  );
+};
+
+module.exports = async function handler(req, res) {
+  // Add CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
+    console.log('Google auth request received:', {
+      method: req.method,
+      headers: req.headers['content-type'],
+      bodyKeys: Object.keys(req.body || {}),
+      googleClientId: process.env.GOOGLE_CLIENT_ID ? 'Set' : 'Not set'
+    });
+
     const { credential } = req.body;
 
     if (!credential) {
+      console.error('No credential in request body:', req.body);
       return res.status(400).json({ error: 'No credential provided' });
     }
 
@@ -50,7 +93,14 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error('Google auth error:', error);
-    res.status(500).json({ error: 'Authentication failed' });
+    console.error('Google auth error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    res.status(500).json({ 
+      error: 'Authentication failed',
+      details: error.message 
+    });
   }
 }

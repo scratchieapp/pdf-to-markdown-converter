@@ -66,6 +66,9 @@ export const useAuthProvider = () => {
     try {
       setIsLoading(true);
       
+      console.log('Attempting login with credential length:', credential.length);
+      console.log('API URL:', `${API_URL}/api/auth/google`);
+      
       const response = await fetch(`${API_URL}/api/auth/google`, {
         method: 'POST',
         headers: {
@@ -74,11 +77,17 @@ export const useAuthProvider = () => {
         body: JSON.stringify({ credential }),
       });
 
+      console.log('Auth response status:', response.status);
+      console.log('Auth response headers:', Object.fromEntries(response.headers.entries()));
+
       if (!response.ok) {
-        throw new Error('Authentication failed');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Auth API error:', errorData);
+        throw new Error(errorData.error || 'Authentication failed');
       }
 
       const { user: userData, token } = await response.json();
+      console.log('Authentication successful, user:', userData);
       
       localStorage.setItem('auth_token', token);
       setUser(userData);
