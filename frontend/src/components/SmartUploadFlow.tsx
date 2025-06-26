@@ -38,6 +38,8 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [markdownContent, setMarkdownContent] = useState<string | null>(null);
+  const [downloadFilename, setDownloadFilename] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<string>('');
@@ -168,13 +170,16 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
         setUploadProgress('Starting upload...');
         setUploadPercentage(10);
         
-        // Simulate upload progress for better UX
+        // Simulate upload progress more accurately
         progressInterval = setInterval(() => {
           setUploadPercentage(prev => {
-            if (prev < 80) return prev + Math.random() * 10;
-            return prev;
+            // Slow down as we approach completion to avoid hitting 100% too early
+            if (prev < 50) return prev + Math.random() * 8;
+            if (prev < 75) return prev + Math.random() * 4;
+            if (prev < 90) return prev + Math.random() * 2;
+            return prev + Math.random() * 0.5; // Very slow after 90%
           });
-        }, 500);
+        }, 800);
         
         const uploadResponse = await fetch(uploadUrl, {
           method: 'POST',
@@ -209,6 +214,13 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
           setDownloadUrl(uploadResult.downloadUrl);
           setCurrentStep('complete');
           console.log('Processing complete immediately');
+          
+          // Store markdown content for direct download
+          if (uploadResult.markdownContent && uploadResult.filename) {
+            setMarkdownContent(uploadResult.markdownContent);
+            setDownloadFilename(uploadResult.filename);
+            console.log('Markdown content stored for direct download');
+          }
         } else {
           // Continue with progress polling
           setUploadProgress('OCR processing started...');
@@ -245,6 +257,8 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
     setSelectedFile(null);
     setError(null);
     setDownloadUrl(null);
+    setMarkdownContent(null);
+    setDownloadFilename(null);
     setPaymentIntentId(null);
     setSessionId(null);
     setUploadProgress('');
@@ -429,7 +443,11 @@ const SmartUploadFlowContent: React.FC<SmartUploadFlowProps> = ({ onConversionCo
               </svg>
               <p className="text-lg font-semibold mt-2">Conversion Complete!</p>
             </div>
-            <DownloadButton downloadUrl={`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}${downloadUrl}`} />
+            <DownloadButton 
+              downloadUrl={downloadUrl ? `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}${downloadUrl}` : undefined}
+              markdownContent={markdownContent || undefined}
+              filename={downloadFilename || undefined}
+            />
             <div className="mt-6">
               <button
                 onClick={handleReset}

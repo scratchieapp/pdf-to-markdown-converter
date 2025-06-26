@@ -20,10 +20,25 @@ module.exports = async function handler(req, res) {
 
   // Get from temporary cache
   const cache = global.conversionCache || new Map();
+  console.log('Download request for sessionId:', sessionId);
+  console.log('Cache size:', cache.size);
+  console.log('Cache keys:', Array.from(cache.keys()));
+  
   const conversion = cache.get(sessionId);
+  console.log('Conversion found:', !!conversion);
 
   if (!conversion) {
-    return res.status(404).json({ error: 'Conversion not found or expired' });
+    console.log('Conversion not found in cache - this is likely due to serverless cold starts');
+    console.log('Available query params:', req.query);
+    
+    // For serverless environments where global cache doesn't persist,
+    // we need an alternative approach. For now, return a helpful error.
+    return res.status(404).json({ 
+      error: 'Conversion not found - serverless cache cleared. Please try converting again.',
+      sessionId: sessionId,
+      cacheSize: cache.size,
+      availableKeys: Array.from(cache.keys())
+    });
   }
 
   // Set headers for file download

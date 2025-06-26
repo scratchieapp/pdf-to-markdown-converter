@@ -144,11 +144,15 @@ module.exports = async function handler(req, res) {
     
     // Store in temporary cache (you'd want to use Redis or cloud storage in production)
     global.conversionCache = global.conversionCache || new Map();
-    global.conversionCache.set(sessionId, {
+    const cacheData = {
       filename,
       content: markdown,
       createdAt: new Date(),
-    });
+    };
+    global.conversionCache.set(sessionId, cacheData);
+    console.log('Stored conversion in cache with sessionId:', sessionId);
+    console.log('Cache size after storing:', global.conversionCache.size);
+    console.log('Markdown content length:', markdown.length);
 
     // Mark as complete
     progressModule.updateProgress(sessionId, {
@@ -165,7 +169,8 @@ module.exports = async function handler(req, res) {
         sessionId,
         downloadUrl,
         filename,
-        markdownLength: markdown.length
+        markdownLength: markdown.length,
+        markdownContent: markdown // Include content directly for immediate download
       };
     };
 

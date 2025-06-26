@@ -1,15 +1,43 @@
 import React from 'react';
 
 interface DownloadButtonProps {
-  downloadUrl: string;
+  downloadUrl?: string;
+  markdownContent?: string;
+  filename?: string;
 }
 
-const DownloadButton: React.FC<DownloadButtonProps> = ({ downloadUrl }) => {
+const DownloadButton: React.FC<DownloadButtonProps> = ({ downloadUrl, markdownContent, filename }) => {
   const handleDownload = async () => {
     try {
+      // If we have direct markdown content, use it (more reliable for serverless)
+      if (markdownContent && filename) {
+        console.log('Using direct markdown content for download');
+        const blob = new Blob([markdownContent], { type: 'text/markdown' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+        return;
+      }
+
+      // Fallback to server download
+      if (!downloadUrl) {
+        throw new Error('No download method available');
+      }
+
+      console.log('Using server download URL');
       const response = await fetch(downloadUrl);
-      const blob = await response.blob();
       
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Server download failed:', errorText);
+        throw new Error(`Download failed: ${response.status}`);
+      }
+      
+      const blob = await response.blob();
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
       // Extract filename from URL or use default
@@ -19,13 +47,10 @@ const DownloadButton: React.FC<DownloadButtonProps> = ({ downloadUrl }) => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
-      // Clean up the object URL
       URL.revokeObjectURL(link.href);
     } catch (error) {
       console.error('Download failed:', error);
-      // Fallback to direct link
-      window.open(downloadUrl, '_blank');
+      alert('Download failed. Please try converting the file again.');
     }
   };
 
